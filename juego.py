@@ -4,6 +4,7 @@ import math
 import socket
 import threading
 import json
+import time
 
 
 HOST = "localhost"  # Dirección del servidor
@@ -46,6 +47,8 @@ clock = pygame.time.Clock()
 CHAR_SIZE = 35
 movimiento = False
 CHAR_X, CHAR_Y = WIDTH // 2, HEIGHT // 2
+SCX = 0
+SCY = 0
 CHAR_SPEED = 3
 CHAR_VX = 0
 CHAR_VY = 0
@@ -54,6 +57,7 @@ clientes = []
 bufferBloques = []
 bloqueSeleccionado = 2
 timeout = 0
+fps = 70
 
 spritepj = pygame.image.load(f'sprite.png')
 spritepj = pygame.transform.scale(spritepj, (CHAR_SIZE, CHAR_SIZE))
@@ -105,20 +109,57 @@ def chequearColisionAxis(futuro_x, futuro_y):
             return True
     return False
 
-def manejarComunicacionCliente(cliente):
-    
+def enviar(cliente):
+    delay = 1/(fps)
     while True:
         try:
+            mensaje = {"bloque":{}, "pos":{"x":0,"y":0}}
+
             if bufferBloques:
-                cliente.send(json.dumps({"bloque":bufferBloques[0]}).encode('utf-8'))
+                mensaje["bloque"] = bufferBloques[0]
                 bufferBloques.pop(0)
-        except:
+
+            mensaje["pos"] = {"x": CHAR_X, "y":CHAR_Y}
+
+            cliente.send(json.dumps(mensaje).encode('utf-8'))
+            
+        except Exception as e:
+            print("error enviando")
+            print(e)
             # Si hay un error, cierra la conexión con el cliente
             cliente.close()
             for i in range(0, len(clientes)):
                 if cliente == clientes[i]:
                     clientes.pop(i)
             break
+        time.sleep(delay)
+
+def recibir(server):
+    delay = 1/(fps)
+    global SCX
+    global SCY
+    while True:
+        try:
+            data = server.recv(1024).decode('utf-8')
+            json_data = json.loads(data)
+            if json_data["bloque"]:
+                bloque = json_data["bloque"]
+                cambiarBloque(bloque["x"], bloque["y"], bloque["id"])
+            
+            pos =json_data["pos"]
+            SCX = pos["x"]
+            SCY = pos["y"]
+        except Exception as e:
+            print("error recibiendo")
+            print(e)
+            # Si hay un error, cierra la conexión con el servidor
+            server.close()
+            for i in range(0, len(clientes)):
+                if server == clientes[i]:
+                    clientes.pop(i)
+            break
+        time.sleep(delay)
+
 
 def atenderClientes(server):
     print("arranca a atender clientes")
@@ -130,30 +171,12 @@ def atenderClientes(server):
             clientes.append(cliente)
 
             # Crea un hilo para atender al cliente
-            hilo_cliente = threading.Thread(target=manejarComunicacionCliente, args=(cliente,))
-            hilo_cliente.start()
+            hilo_enviar = threading.Thread(target=enviar, args=(cliente,))
+            hilo_enviar.start()
+            hilo_recibir= threading.Thread(target=recibir, args=(cliente,))
+            hilo_recibir.start()
         except:
             print("error 1")
-
-def recibirMensajes(server):
-    print("tremendo")
-    while True:
-        try:
-            # Recibe mensajes del servidor
-            data = server.recv(1024).decode('utf-8')
-            json_data = json.loads(data)
-            print("Datos recibidos del cliente:", json_data)
-            if json_data["bloque"]:
-                bloque = json_data["bloque"]
-                cambiarBloque(bloque["x"], bloque["y"], bloque["id"])
-
-        except:
-            # Si hay un error, cierra la conexión con el servidor
-            server.close()
-            global conexionEstablecida 
-            conexionEstablecida = False
-            print("Conexión con el servidor cerrada.")
-            return
 
 def abrirServidor():
     try:
@@ -166,8 +189,11 @@ def abrirServidor():
     except:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Crea un socket TCP
         server.connect((HOST, PORT))  # Se conecta al servidor
-        listener = threading.Thread(target=recibirMensajes, args=(server,))
+        listener = threading.Thread(target=recibir, args=(server,))
+        sender = threading.Thread(target=enviar, args=(server,))
+        fps = 70
         listener.start()
+        sender.start()
         print("Servidor ya iniciado, modo cliente")
         return
 
@@ -244,9 +270,11 @@ while True:
 
     # Dibuja el personaje
     WIN.blit(spritepj,(CHAR_X, CHAR_Y, CHAR_SIZE, CHAR_SIZE))
+    if SCX and SCY:
+        WIN.blit(spritepj,(SCX, SCY, CHAR_SIZE, CHAR_SIZE))
     
     # Actualiza la pantalla
     pygame.display.flip()
     
     # Controla los FPS
-    clock.tick(60)  # Ajusta los FPS según lo necesites
+    clock.tick(fps)  # Ajusta los FPS según lo necesites
