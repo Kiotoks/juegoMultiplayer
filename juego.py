@@ -1,12 +1,10 @@
 import pygame
 import sys
+import math
 
 # Inicializa Pygame
 pygame.init()
 
-# Configura las dimensiones de la ventana
-
-# Configura la grilla
 GRID_SIZE = 40
 CHAR_SIZE = GRID_SIZE
 GRID_WIDTH = 30
@@ -16,18 +14,14 @@ RED = (255, 0, 0)
 WIDTH, HEIGHT = GRID_WIDTH * GRID_SIZE, GRID_HEIGHT * GRID_WIDTH
 
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Movimiento en Grilla con Fondo")
+pygame.display.set_caption("Survival")
 
 # Configura la posición inicial del personaje
 CHAR_X, CHAR_Y = GRID_WIDTH // 2 * GRID_SIZE, GRID_HEIGHT // 2 * GRID_SIZE
 CHAR_SPEED = GRID_SIZE
 
 # Carga las imágenes de la grilla
-background_images = []
-
-worldfile = open("world.txt","r").readlines()
-for i in range(len(worldfile)):
-    worldfile[i] = worldfile[i][:-1]
+worldfile = []
 
 worldSprites = []
 
@@ -35,31 +29,70 @@ for i in range(3):
     worldSprites.append(pygame.image.load(f'cell{i}.png'))
     worldSprites[i] = pygame.transform.scale(worldSprites[i], (GRID_SIZE, GRID_SIZE))
 
-spritepj = pygame.image.load(f'sprite.png')
-spritepj = pygame.transform.scale(spritepj, (GRID_SIZE, GRID_SIZE))
+blockSound = pygame.mixer.Sound("block.wav")
 
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
 
 # Controla el estado de movimiento
-CHAR_SIZE = 40
+CHAR_SIZE = 35
 movimiento = False
 CHAR_X, CHAR_Y = WIDTH // 2, HEIGHT // 2
 CHAR_SPEED = 3
+CHAR_VX = 0
+CHAR_VY = 0
+bloqueSeleccionado = 2
+timeout = 0
+
+spritepj = pygame.image.load(f'sprite.png')
+spritepj = pygame.transform.scale(spritepj, (CHAR_SIZE, CHAR_SIZE))
+
 
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
 
+
+def readWorldData():
+    worldfile = open("world.txt","r").readlines()
+    for i in range(len(worldfile)):
+        worldfile[i] = worldfile[i][:-1]
+        worldfile[i] = list(worldfile[i])
+
+    newWorldFile = []
+    for x in worldfile:
+        newLine = []
+        for y in x:
+            newLine.append(int(y))
+        newWorldFile.append(newLine)
+
+    return newWorldFile
+
 def cambiarCoordsAGrid(x,y):
-    return x/GRID_SIZE , y/GRID_SIZE
+    return  math.trunc(x/GRID_SIZE) , math.trunc(y/GRID_SIZE)
 
 def getBlockInGrid(x,y):
     return int(worldfile[y][x])
 
 def cambiarBloque(x, y , id):
-    worldfile[y][x] = id
+    if worldfile[y][x] != id:
+        pygame.mixer.Sound.play(blockSound)
+        worldfile[y][x] = id
 
-# Bucle principal del juego
+def chequearColisionAxis(futuro_x, futuro_y):
+    future_grid_corners = [
+        cambiarCoordsAGrid(futuro_x, futuro_y),  # esquina superior izquierda
+        cambiarCoordsAGrid(futuro_x + CHAR_SIZE, futuro_y),  # esquina superior derecha
+        cambiarCoordsAGrid(futuro_x, futuro_y + CHAR_SIZE),  # esquina inferior izquierda
+        cambiarCoordsAGrid(futuro_x + CHAR_SIZE, futuro_y + CHAR_SIZE)  # esquina inferior derecha
+    ]
+    
+    for corner in future_grid_corners:
+        if getBlockInGrid(*corner) == 2:
+            return True
+    return False
+
+worldfile = readWorldData()
+
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -69,24 +102,53 @@ while True:
     # Obtén las teclas presionadas
     keys = pygame.key.get_pressed()
     
+    
     if keys[pygame.K_w]:
-        CHAR_Y -= CHAR_SPEED
+        CHAR_VY = -1
     if keys[pygame.K_s]:
-        CHAR_Y += CHAR_SPEED
+        CHAR_VY = 1
+    
     if keys[pygame.K_a]:
-        CHAR_X -= CHAR_SPEED
+        CHAR_VX = -1
     if keys[pygame.K_d]:
-        CHAR_X += CHAR_SPEED
-   
-    if event.type == pygame.MOUSEBUTTONDOWN and movimiento:
+        CHAR_VX = 1
+    
+    if CHAR_VY != 0 and CHAR_VX != 0:
+        CHAR_VX = CHAR_VX/1.414 
+        CHAR_VY = CHAR_VY/1.414
+
+    # Calcular la posición futura
+    futuro_x = CHAR_X + CHAR_VX * CHAR_SPEED
+    futuro_y = CHAR_Y + CHAR_VY * CHAR_SPEED
+    
+    # Convertir las coordenadas futuras a coordenadas de grilla
+    if chequearColisionAxis(futuro_x, CHAR_Y):
+        CHAR_VX = 0
+    if chequearColisionAxis(CHAR_X, futuro_y):
+        CHAR_VY = 0
+        
+
+    CHAR_X += CHAR_VX * CHAR_SPEED
+    CHAR_Y += CHAR_VY * CHAR_SPEED
+
+    CHAR_VX = 0
+    CHAR_VY = 0
+
+    if  pygame.mouse.get_pressed() and movimiento:
         mouse_x, mouse_y = pygame.mouse.get_pos()
         cell_x , cell_y = cambiarCoordsAGrid(mouse_x, mouse_y)
-        cambiarBloque(cell_x, cell_y, 2)
+        if pygame.mouse.get_pressed()[2]:
+            cambiarBloque(cell_x, cell_y, bloqueSeleccionado)
+        elif pygame.mouse.get_pressed()[0]:
+            cambiarBloque(cell_x, cell_y, 0)
         movimiento = False
+    
+    if timeout != 0:
+        timeout -= 1
 
     if event.type == pygame.MOUSEMOTION:
         movimiento = True
-    
+
     # Asegúrate de que el personaje no se salga de la ventana
     CHAR_X = max(0, min(CHAR_X, WIDTH - CHAR_SIZE))
     CHAR_Y = max(0, min(CHAR_Y, HEIGHT - CHAR_SIZE))
