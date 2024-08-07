@@ -1,6 +1,13 @@
 import pygame
 import sys
 import math
+import socket
+import threading
+import json
+
+
+HOST = "localhost"  # Dirección del servidor
+PORT = 8000  # Puerto del servidor
 
 # Inicializa Pygame
 pygame.init()
@@ -22,14 +29,15 @@ CHAR_SPEED = GRID_SIZE
 
 # Carga las imágenes de la grilla
 worldfile = []
-
+blockSounds = []
 worldSprites = []
 
 for i in range(3):
     worldSprites.append(pygame.image.load(f'cell{i}.png'))
     worldSprites[i] = pygame.transform.scale(worldSprites[i], (GRID_SIZE, GRID_SIZE))
 
-blockSound = pygame.mixer.Sound("block.wav")
+for i in range(3):
+    blockSounds.append(pygame.mixer.Sound(f'block{i}.wav'))
 
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
@@ -41,6 +49,9 @@ CHAR_X, CHAR_Y = WIDTH // 2, HEIGHT // 2
 CHAR_SPEED = 3
 CHAR_VX = 0
 CHAR_VY = 0
+online = False
+clientes = []
+bufferBloques = []
 bloqueSeleccionado = 2
 timeout = 0
 
@@ -50,7 +61,6 @@ spritepj = pygame.transform.scale(spritepj, (CHAR_SIZE, CHAR_SIZE))
 
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
-
 
 def readWorldData():
     worldfile = open("world.txt","r").readlines()
@@ -75,8 +85,12 @@ def getBlockInGrid(x,y):
 
 def cambiarBloque(x, y , id):
     if worldfile[y][x] != id:
-        pygame.mixer.Sound.play(blockSound)
+        if id != 0:
+            if abs(x*40 - CHAR_X) <= 40 and abs(y*40 - CHAR_Y) <= 40:
+                return
+        pygame.mixer.Sound.play(blockSounds[id])
         worldfile[y][x] = id
+        bufferBloques.append({"x":x, "y":y, "id":id})
 
 def chequearColisionAxis(futuro_x, futuro_y):
     future_grid_corners = [
@@ -91,6 +105,72 @@ def chequearColisionAxis(futuro_x, futuro_y):
             return True
     return False
 
+def manejarComunicacionCliente(cliente):
+    
+    while True:
+        try:
+            if bufferBloques:
+                cliente.send(json.dumps({"bloque":bufferBloques[0]}).encode('utf-8'))
+                bufferBloques.pop(0)
+        except:
+            # Si hay un error, cierra la conexión con el cliente
+            cliente.close()
+            for i in range(0, len(clientes)):
+                if cliente == clientes[i]:
+                    clientes.pop(i)
+            break
+
+def atenderClientes(server):
+    print("arranca a atender clientes")
+    while True:
+        try:
+            cliente, direccion = server.accept()
+            print(f"[CONEXIÓN] Cliente conectado desde {direccion}")
+
+            clientes.append(cliente)
+
+            # Crea un hilo para atender al cliente
+            hilo_cliente = threading.Thread(target=manejarComunicacionCliente, args=(cliente,))
+            hilo_cliente.start()
+        except:
+            print("error 1")
+
+def recibirMensajes(server):
+    print("tremendo")
+    while True:
+        try:
+            # Recibe mensajes del servidor
+            data = server.recv(1024).decode('utf-8')
+            json_data = json.loads(data)
+            print("Datos recibidos del cliente:", json_data)
+            if json_data["bloque"]:
+                bloque = json_data["bloque"]
+                cambiarBloque(bloque["x"], bloque["y"], bloque["id"])
+
+        except:
+            # Si hay un error, cierra la conexión con el servidor
+            server.close()
+            global conexionEstablecida 
+            conexionEstablecida = False
+            print("Conexión con el servidor cerrada.")
+            return
+
+def abrirServidor():
+    try:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Crea un socket TCP
+        server.bind((HOST, PORT))  # Asocia el socket a la dirección y puerto
+        server.listen(5)  # Pone el socket en modo escucha
+        print("[SERVIDOR] Servidor iniciado")
+        listener = threading.Thread(target=atenderClientes, args=(server,))
+        listener.start()
+    except:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Crea un socket TCP
+        server.connect((HOST, PORT))  # Se conecta al servidor
+        listener = threading.Thread(target=recibirMensajes, args=(server,))
+        listener.start()
+        print("Servidor ya iniciado, modo cliente")
+        return
+
 worldfile = readWorldData()
 
 while True:
@@ -103,6 +183,10 @@ while True:
     keys = pygame.key.get_pressed()
     
     
+    if keys[pygame.K_m] and not online:
+        abrirServidor()
+        online = True
+
     if keys[pygame.K_w]:
         CHAR_VY = -1
     if keys[pygame.K_s]:
