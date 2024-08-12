@@ -50,8 +50,11 @@ online = False
 clientes = []
 vida = 10
 dmgCooldown = 0
+primaryCooldown = 0
 bufferBloques = []
 bloqueSeleccionado = 2
+proyectiles = []
+enemies = []
 font = pygame.font.Font('freesansbold.ttf', 32)
 timeout = 0
 fps = 70
@@ -62,6 +65,48 @@ spritepj = pygame.transform.scale(spritepj, (CHAR_SIZE, CHAR_SIZE))
 
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
+
+
+class Projectile:
+    def __init__(self, x, y, vx, vy, v, size, color):
+        self.x = x
+        self.y = y
+        self.vx = vx
+        self.vy = vy
+        self.size = size
+        self.color = color
+        self.v = v
+
+    def update(self):
+        self.x += self.vx * self.v
+        self.y += self.vy * self.v
+
+    def checkCol(self, enemies):
+        if self.x > WIDTH or self.x < 0:
+            return True
+        if self.y > HEIGHT or self.y < 0:
+            return True
+        if getBlockInGrid(*cambiarCoordsAGrid(self.x, self.y)):
+            return True
+            
+
+    def draw(self, screen):
+        self.update()
+        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.size)
+
+
+class Enemy:
+    def __init__(self, x, y, v, size, type, color):
+        self.x = x
+        self.y = y
+        self.size = size
+        self.type = type
+        self.color = color
+        self.v = v
+
+    def draw(self, screen):
+        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.size)
+
 
 def readWorldData():
     worldfile = open("world.txt","r").readlines()
@@ -218,6 +263,21 @@ def abrirServidor():
         print("Servidor ya iniciado, modo cliente")
         return
 
+def getNormDir(x1, y1, x2, y2):
+    # Step 1: Calculate the direction vector
+    dx = x2 - x1
+    dy = y2 - y1
+
+    magnitude = math.sqrt(dx**2 + dy**2)
+
+    # Step 3: Normalize the direction vector
+    if magnitude != 0:
+        dx /= magnitude
+        dy /= magnitude
+
+    return dx, dy
+
+
 def die():
     global CHAR_X, CHAR_Y, HEIGHT, WIDTH, vida
     CHAR_X = WIDTH/2
@@ -291,18 +351,30 @@ while True:
     CHAR_VY = 0
 
     if  pygame.mouse.get_pressed() and movimiento and vida:
+
         mouse_x, mouse_y = pygame.mouse.get_pos()
         cell_x , cell_y = cambiarCoordsAGrid(mouse_x, mouse_y)
-        if pygame.mouse.get_pressed()[2]:
-            cambiarBloque(cell_x, cell_y, bloqueSeleccionado, False)
+
+        if pygame.mouse.get_pressed()[2] and not primaryCooldown:
+
+            px, py = getNormDir(CHAR_X, CHAR_Y, mouse_x, mouse_y)
+            p = Projectile(gx, gy, px, py, 5, 10, (255,255,255))
+            proyectiles.append(p)
+            primaryCooldown = 45
+            #cambiarBloque(cell_x, cell_y, bloqueSeleccionado, False)
+
         elif pygame.mouse.get_pressed()[0]:
+
             cambiarBloque(cell_x, cell_y, 0, False)
+
         movimiento = False
     
     if timeout != 0:
         timeout -= 1
     if dmgCooldown:
         dmgCooldown -= 1
+    if primaryCooldown:
+        primaryCooldown -= 1
 
     if event.type == pygame.MOUSEMOTION:
         movimiento = True
@@ -315,6 +387,14 @@ while True:
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
             WIN.blit(worldSprites[getBlockInGrid(x,y)], (x * GRID_SIZE, y * GRID_SIZE))
+
+    for p in proyectiles:
+        p.draw(WIN)
+        if p.checkCol(enemies):
+            proyectiles.remove(p)
+    
+    for e in enemies:
+        e.draw(WIN)
 
     # Dibuja el personaje
     WIN.blit(spritepj,(CHAR_X, CHAR_Y, CHAR_SIZE, CHAR_SIZE))
