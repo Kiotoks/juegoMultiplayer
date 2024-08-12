@@ -14,19 +14,13 @@ PORT = 8000  # Puerto del servidor
 pygame.init()
 
 GRID_SIZE = 40
-CHAR_SIZE = GRID_SIZE
 GRID_WIDTH = 30
 GRID_HEIGHT = 20
-RED = (255, 0, 0)
 
 WIDTH, HEIGHT = GRID_WIDTH * GRID_SIZE, GRID_HEIGHT * GRID_WIDTH
 
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Survival")
-
-# Configura la posición inicial del personaje
-CHAR_X, CHAR_Y = GRID_WIDTH // 2 * GRID_SIZE, GRID_HEIGHT // 2 * GRID_SIZE
-CHAR_SPEED = GRID_SIZE
 
 # Carga las imágenes de la grilla
 worldfile = []
@@ -87,14 +81,15 @@ def cambiarCoordsAGrid(x,y):
 def getBlockInGrid(x,y):
     return int(worldfile[y][x])
 
-def cambiarBloque(x, y , id):
+def cambiarBloque(x, y , id, out):
     if worldfile[y][x] != id:
         if id != 0:
             if abs(x*40 - CHAR_X) <= 40 and abs(y*40 - CHAR_Y) <= 40:
                 return
         pygame.mixer.Sound.play(blockSounds[id])
         worldfile[y][x] = id
-        bufferBloques.append({"x":x, "y":y, "id":id})
+        if not out :
+            bufferBloques.append({"x":x, "y":y, "id":id})
 
 def chequearColisionAxis(futuro_x, futuro_y):
     future_grid_corners = [
@@ -125,6 +120,7 @@ def enviar(cliente):
             
         except Exception as e:
             print("error enviando")
+            print(mensaje)
             print(e)
             # Si hay un error, cierra la conexión con el cliente
             cliente.close()
@@ -144,13 +140,14 @@ def recibir(server):
             json_data = json.loads(data)
             if json_data["bloque"]:
                 bloque = json_data["bloque"]
-                cambiarBloque(bloque["x"], bloque["y"], bloque["id"])
+                cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
             
             pos =json_data["pos"]
             SCX = pos["x"]
             SCY = pos["y"]
         except Exception as e:
             print("error recibiendo")
+            print(json_data)
             print(e)
             # Si hay un error, cierra la conexión con el servidor
             server.close()
@@ -179,16 +176,19 @@ def atenderClientes(server):
             print("error 1")
 
 def abrirServidor():
+    bufferBloques = []
     try:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Crea un socket TCP
         server.bind((HOST, PORT))  # Asocia el socket a la dirección y puerto
+        server.settimeout(60)
         server.listen(5)  # Pone el socket en modo escucha
         print("[SERVIDOR] Servidor iniciado")
         listener = threading.Thread(target=atenderClientes, args=(server,))
         listener.start()
     except:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Crea un socket TCP
-        server.connect((HOST, PORT))  # Se conecta al servidor
+        server.connect((HOST, PORT))
+        server.settimeout(60)  # Se conecta al servidor
         listener = threading.Thread(target=recibir, args=(server,))
         sender = threading.Thread(target=enviar, args=(server,))
         fps = 70
@@ -248,9 +248,9 @@ while True:
         mouse_x, mouse_y = pygame.mouse.get_pos()
         cell_x , cell_y = cambiarCoordsAGrid(mouse_x, mouse_y)
         if pygame.mouse.get_pressed()[2]:
-            cambiarBloque(cell_x, cell_y, bloqueSeleccionado)
+            cambiarBloque(cell_x, cell_y, bloqueSeleccionado, False)
         elif pygame.mouse.get_pressed()[0]:
-            cambiarBloque(cell_x, cell_y, 0)
+            cambiarBloque(cell_x, cell_y, 0, False)
         movimiento = False
     
     if timeout != 0:
