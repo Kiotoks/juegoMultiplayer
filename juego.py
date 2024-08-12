@@ -48,8 +48,11 @@ CHAR_VX = 0
 CHAR_VY = 0
 online = False
 clientes = []
+vida = 10
+dmgCooldown = 0
 bufferBloques = []
 bloqueSeleccionado = 2
+font = pygame.font.Font('freesansbold.ttf', 32)
 timeout = 0
 fps = 70
 
@@ -215,6 +218,26 @@ def abrirServidor():
         print("Servidor ya iniciado, modo cliente")
         return
 
+def die():
+    global CHAR_X, CHAR_Y, HEIGHT, WIDTH, vida
+    CHAR_X = WIDTH/2
+    CHAR_Y = HEIGHT/2
+    vida = 10
+
+def applyDmg():
+    global vida
+    if vida > 0:
+        vida -= 1
+        print(vida)
+    if not vida:
+        die()
+
+def renderUI():
+    global font, WIN, vida
+    color = (255,255,255)
+    text = font.render(f"Life: {vida}", True, color)
+    WIN.blit(text, (10, 10)) 
+
 worldfile = readWorldData()
 
 while True:
@@ -231,15 +254,16 @@ while True:
         abrirServidor()
         online = True
 
-    if keys[pygame.K_w]:
-        CHAR_VY = -1
-    if keys[pygame.K_s]:
-        CHAR_VY = 1
-    
-    if keys[pygame.K_a]:
-        CHAR_VX = -1
-    if keys[pygame.K_d]:
-        CHAR_VX = 1
+    if vida:
+        if keys[pygame.K_w]:
+            CHAR_VY = -1
+        if keys[pygame.K_s]:
+            CHAR_VY = 1
+        
+        if keys[pygame.K_a]:
+            CHAR_VX = -1
+        if keys[pygame.K_d]:
+            CHAR_VX = 1
     
     if CHAR_VY != 0 and CHAR_VX != 0:
         CHAR_VX = CHAR_VX/1.414 
@@ -254,7 +278,11 @@ while True:
         CHAR_VX = 0
     if chequearColisionAxis(CHAR_X, futuro_y):
         CHAR_VY = 0
-        
+    gx = CHAR_X+CHAR_SIZE/2
+    gy = CHAR_Y+ CHAR_SIZE/2
+    if getBlockInGrid(*cambiarCoordsAGrid(gx, gy)) == 1 and not dmgCooldown:
+        applyDmg()
+        dmgCooldown = 30
 
     CHAR_X += CHAR_VX * CHAR_SPEED
     CHAR_Y += CHAR_VY * CHAR_SPEED
@@ -262,7 +290,7 @@ while True:
     CHAR_VX = 0
     CHAR_VY = 0
 
-    if  pygame.mouse.get_pressed() and movimiento:
+    if  pygame.mouse.get_pressed() and movimiento and vida:
         mouse_x, mouse_y = pygame.mouse.get_pos()
         cell_x , cell_y = cambiarCoordsAGrid(mouse_x, mouse_y)
         if pygame.mouse.get_pressed()[2]:
@@ -273,6 +301,8 @@ while True:
     
     if timeout != 0:
         timeout -= 1
+    if dmgCooldown:
+        dmgCooldown -= 1
 
     if event.type == pygame.MOUSEMOTION:
         movimiento = True
@@ -291,6 +321,8 @@ while True:
     if SCX and SCY:
         WIN.blit(spritepj,(SCX, SCY, CHAR_SIZE, CHAR_SIZE))
     
+    renderUI()
+
     # Actualiza la pantalla
     pygame.display.flip()
     
