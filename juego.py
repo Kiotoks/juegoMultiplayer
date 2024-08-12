@@ -131,30 +131,48 @@ def enviar(cliente):
         time.sleep(delay)
 
 def recibir(server):
-    delay = 1/(fps)
+    delay = 1 / fps
     global SCX
     global SCY
+    buffer = ""
+    
     while True:
         try:
+            # Recibir datos del servidor
             data = server.recv(1024).decode('utf-8')
-            json_data = json.loads(data)
-            if json_data["bloque"]:
-                bloque = json_data["bloque"]
-                cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
+            buffer += data
             
-            pos =json_data["pos"]
-            SCX = pos["x"]
-            SCY = pos["y"]
+            # Procesar los datos en el buffer
+            while True:
+                try:
+                    # Intentar cargar un objeto JSON desde el buffer
+                    json_data, index = json.JSONDecoder().raw_decode(buffer)
+                    buffer = buffer[index:].lstrip()
+                    
+                    # Procesar el objeto JSON
+                    if "bloque" in json_data:
+                        bloque = json_data["bloque"]
+                        cambiarBloque(bloque["x"], bloque["y"], bloque["id"])
+                    
+                    if "pos" in json_data:
+                        pos = json_data["pos"]
+                        SCX = pos["x"]
+                        SCY = pos["y"]
+                
+                except json.JSONDecodeError:
+                    # Si no se puede decodificar más, salir del bucle interno
+                    break
+            
         except Exception as e:
-            print("error recibiendo")
-            print(json_data)
+            print("error recibiendo:", buffer)
             print(e)
             # Si hay un error, cierra la conexión con el servidor
             server.close()
-            for i in range(0, len(clientes)):
+            for i in range(len(clientes)):
                 if server == clientes[i]:
                     clientes.pop(i)
             break
+        
         time.sleep(delay)
 
 
