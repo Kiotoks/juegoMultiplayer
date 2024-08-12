@@ -108,7 +108,7 @@ def enviar(cliente):
     delay = 1/(fps)
     while True:
         try:
-            mensaje = {"bloque":{}, "pos":{"x":0,"y":0}}
+            mensaje = {"pos":{"x":0,"y":0}}
 
             if bufferBloques:
                 mensaje["bloque"] = bufferBloques[0]
@@ -152,7 +152,7 @@ def recibir(server):
                     # Procesar el objeto JSON
                     if "bloque" in json_data:
                         bloque = json_data["bloque"]
-                        cambiarBloque(bloque["x"], bloque["y"], bloque["id"])
+                        cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
                     
                     if "pos" in json_data:
                         pos = json_data["pos"]
