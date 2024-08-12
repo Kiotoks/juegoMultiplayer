@@ -39,24 +39,29 @@ clock = pygame.time.Clock()
 
 # Controla el estado de movimiento
 CHAR_SIZE = 35
-movimiento = False
 CHAR_X, CHAR_Y = WIDTH // 2, HEIGHT // 2
 SCX = 0
 SCY = 0
 CHAR_SPEED = 3
 CHAR_VX = 0
 CHAR_VY = 0
+VIDA = 10
+
 online = False
-clientes = []
-vida = 10
+movimiento = False
+
 dmgCooldown = 0
 primaryCooldown = 0
-bufferBloques = []
+timeout = 0
+
 bloqueSeleccionado = 2
+
+clientes = []
+bufferBloques = []
 proyectiles = []
 enemies = []
+
 font = pygame.font.Font('freesansbold.ttf', 32)
-timeout = 0
 fps = 70
 
 spritepj = pygame.image.load(f'sprite.png')
@@ -108,8 +113,8 @@ class Enemy:
         pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.size)
 
 
-def readWorldData():
-    worldfile = open("world.txt","r").readlines()
+def readWorldData(name):
+    worldfile = open(name,"r").readlines()
     for i in range(len(worldfile)):
         worldfile[i] = worldfile[i][:-1]
         worldfile[i] = list(worldfile[i])
@@ -128,6 +133,8 @@ def cambiarCoordsAGrid(x,y):
 
 def getBlockInGrid(x,y):
     return int(worldfile[y][x])
+def getBlockInBack(x,y):
+    return int(background[y][x])
 
 def cambiarBloque(x, y , id, out):
     if worldfile[y][x] != id:
@@ -279,26 +286,27 @@ def getNormDir(x1, y1, x2, y2):
 
 
 def die():
-    global CHAR_X, CHAR_Y, HEIGHT, WIDTH, vida
+    global CHAR_X, CHAR_Y, HEIGHT, WIDTH, VIDA
     CHAR_X = WIDTH/2
     CHAR_Y = HEIGHT/2
-    vida = 10
+    VIDA = 10
 
 def applyDmg():
-    global vida
-    if vida > 0:
-        vida -= 1
-        print(vida)
-    if not vida:
+    global VIDA
+    if VIDA > 0:
+        VIDA -= 1
+        print(VIDA)
+    if not VIDA:
         die()
 
 def renderUI():
-    global font, WIN, vida
+    global font, WIN, VIDA
     color = (255,255,255)
-    text = font.render(f"Life: {vida}", True, color)
+    text = font.render(f"Life: {VIDA}", True, color)
     WIN.blit(text, (10, 10)) 
 
-worldfile = readWorldData()
+worldfile = readWorldData("world.txt")
+background = readWorldData("back.txt")
 
 while True:
     for event in pygame.event.get():
@@ -314,7 +322,7 @@ while True:
         abrirServidor()
         online = True
 
-    if vida:
+    if VIDA:
         if keys[pygame.K_w]:
             CHAR_VY = -1
         if keys[pygame.K_s]:
@@ -350,7 +358,7 @@ while True:
     CHAR_VX = 0
     CHAR_VY = 0
 
-    if  pygame.mouse.get_pressed() and movimiento and vida:
+    if  pygame.mouse.get_pressed() and movimiento and VIDA:
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
         cell_x , cell_y = cambiarCoordsAGrid(mouse_x, mouse_y)
@@ -386,7 +394,11 @@ while True:
     # Dibuja el fondo
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
-            WIN.blit(worldSprites[getBlockInGrid(x,y)], (x * GRID_SIZE, y * GRID_SIZE))
+            block = getBlockInGrid(x,y)
+            if getBlockInGrid(x,y) == 0:
+                WIN.blit(worldSprites[getBlockInBack(x, y)], (x * GRID_SIZE, y * GRID_SIZE))
+            else:
+                WIN.blit(worldSprites[block], (x * GRID_SIZE, y * GRID_SIZE))
 
     for p in proyectiles:
         p.draw(WIN)
