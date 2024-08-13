@@ -26,6 +26,7 @@ pygame.display.set_caption("Survival")
 worldfile = []
 blockSounds = []
 worldSprites = []
+enemSprites = []
 
 for i in range(3):
     worldSprites.append(pygame.image.load(f'cell{i}.png'))
@@ -33,6 +34,10 @@ for i in range(3):
 
 for i in range(3):
     blockSounds.append(pygame.mixer.Sound(f'block{i}.wav'))
+
+for i in range(1):
+    enemSprites.append(pygame.image.load(f'enem{i}.png'))
+    enemSprites[i] = pygame.transform.scale(enemSprites[i], (GRID_SIZE, GRID_SIZE))
 
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
@@ -93,6 +98,11 @@ class Projectile:
             return True
         if getBlockInGrid(*cambiarCoordsAGrid(self.x, self.y)):
             return True
+        for e in enemies:
+            ex , ey = e.coords()
+            if abs( ex - self.x) <= e.size and abs(ey - self.y) <= e.size:
+                e.applyDmg()
+                return True
             
 
     def draw(self, screen):
@@ -101,16 +111,31 @@ class Projectile:
 
 
 class Enemy:
-    def __init__(self, x, y, v, size, type, color):
+    def __init__(self, x, y, v, size, type, color, enemSprites, vida):
         self.x = x
         self.y = y
         self.size = size
         self.type = type
         self.color = color
+        self.vida = vida
         self.v = v
+        self.sprite = enemSprites[type]
+        self.cooldown = 0
+    
+    def applyDmg(self):
+        if self.vida > 0 and not self.cooldown:
+            self.vida -= 1
+            self.cooldown = 5
+        print(self.vida)
+        
+
+    def coords(self):
+        return self.x + self.size/2, self.y + self.size/2
 
     def draw(self, screen):
-        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.size)
+        screen.blit(self.sprite,(self.x, self.y, self.size, self.size))
+        if self.cooldown > 0:
+            self.cooldown -= 1
 
 
 def readWorldData(name):
@@ -308,6 +333,8 @@ def renderUI():
 worldfile = readWorldData("world.txt")
 background = readWorldData("back.txt")
 
+enemies.append(Enemy(100, 100, 3, 40, 0, (255,255,255), enemSprites, 10))
+
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -406,10 +433,18 @@ while True:
             proyectiles.remove(p)
     
     for e in enemies:
+        ex , ey = e.coords()
+        if abs( ex - gx) <= e.size and abs(ey - gy) <= e.size:
+            if not dmgCooldown:
+                applyDmg()
+                dmgCooldown = 30
+        if e.vida < 1:
+            enemies.remove(e)
         e.draw(WIN)
 
     # Dibuja el personaje
     WIN.blit(spritepj,(CHAR_X, CHAR_Y, CHAR_SIZE, CHAR_SIZE))
+
     if SCX and SCY:
         WIN.blit(spritepj,(SCX, SCY, CHAR_SIZE, CHAR_SIZE))
     
