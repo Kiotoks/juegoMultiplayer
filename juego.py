@@ -137,6 +137,9 @@ class Enemy:
         if self.cooldown > 0:
             self.cooldown -= 1
 
+class Slime(Enemy):
+    def __init__(self, x, y, enemSprites):
+        super().__init__(x, y, 3, 40, 0, (255, 255, 255), enemSprites, 5)
 
 def readWorldData(name):
     worldfile = open(name,"r").readlines()
@@ -333,7 +336,7 @@ def renderUI():
 worldfile = readWorldData("world.txt")
 background = readWorldData("back.txt")
 
-enemies.append(Enemy(100, 100, 3, 40, 0, (255,255,255), enemSprites, 10))
+enemies.append(Slime(100, 100, enemSprites))
 
 while True:
     for event in pygame.event.get():
