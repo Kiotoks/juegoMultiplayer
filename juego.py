@@ -5,7 +5,7 @@ import socket
 import threading
 import json
 import time
-
+import os
 
 HOST = "localhost"  # Dirección del servidor
 PORT = 8000  # Puerto del servidor
@@ -28,15 +28,17 @@ blockSounds = []
 worldSprites = []
 enemSprites = []
 
+cwd = os.getcwd()
+
 for i in range(3):
-    worldSprites.append(pygame.image.load(f'cell{i}.png'))
+    worldSprites.append(pygame.image.load(f'{cwd}/files/sprites/cell{i}.png'))
     worldSprites[i] = pygame.transform.scale(worldSprites[i], (GRID_SIZE, GRID_SIZE))
 
 for i in range(3):
-    blockSounds.append(pygame.mixer.Sound(f'block{i}.wav'))
+    blockSounds.append(pygame.mixer.Sound(f'{cwd}/files/sounds/block{i}.wav'))
 
 for i in range(1):
-    enemSprites.append(pygame.image.load(f'enem{i}.png'))
+    enemSprites.append(pygame.image.load(f'{cwd}/files/sprites/enem{i}.png'))
     enemSprites[i] = pygame.transform.scale(enemSprites[i], (GRID_SIZE, GRID_SIZE))
 
 # Reloj para controlar los FPS
@@ -69,7 +71,7 @@ enemies = []
 font = pygame.font.Font('freesansbold.ttf', 32)
 fps = 70
 
-spritepj = pygame.image.load(f'sprite.png')
+spritepj = pygame.image.load(f'{cwd}/files/sprites/sprite.png')
 spritepj = pygame.transform.scale(spritepj, (CHAR_SIZE, CHAR_SIZE))
 
 
