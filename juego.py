@@ -66,7 +66,7 @@ bloqueSeleccionado = 2
 clientes = []
 bufferBloques = []
 proyectiles = []
-enemies = []
+entities = []
 
 font = pygame.font.Font('freesansbold.ttf', 32)
 fps = 70
@@ -92,28 +92,30 @@ class Entity():
         print(self.type)
 
 class Projectile(Entity):
-    def __init__(self, x, y, v, size, sprite, vx, vy):
+    def __init__(self, x, y, v, size, sprite, vx, vy, dmg):
         self.sprite = pygame.transform.scale(sprite, (size, size))
         super().__init__(x, y, v, size, self.sprite, "projectile")
         self.vx = vx
         self.vy = vy
+        self.dmg = dmg
 
     def update(self):
         self.x += self.vx * self.v
         self.y += self.vy * self.v
 
-    def checkCol(self, enemies):
+    def checkCol(self, entities):
         if self.x > WIDTH or self.x < 0:
             return True
         if self.y > HEIGHT or self.y < 0:
             return True
         if getBlockInGrid(*cambiarCoordsAGrid(self.x, self.y)):
             return True
-        for e in enemies:
-            ex , ey = e.coords()
-            if abs( ex - self.x) <= e.size and abs(ey - self.y) <= e.size:
-                e.applyDmg()
-                return True
+        for e in entities:
+            if e.type == "enemy":
+                ex , ey = e.coords()
+                if abs( ex - self.x) <= e.size and abs(ey - self.y) <= e.size:
+                    e.applyDmg(self.dmg)
+                    return True
             
     def draw(self, screen):
         self.update()
@@ -128,9 +130,9 @@ class Enemy(Entity):
         self.sprite = sprite
         self.cooldown = 0
     
-    def applyDmg(self):
+    def applyDmg(self, dmg):
         if self.vida > 0 and not self.cooldown:
-            self.vida -= 1
+            self.vida -= math.trunc(dmg)
             self.cooldown = 5
         print(self.vida)
         
@@ -145,6 +147,10 @@ class Enemy(Entity):
 class Slime(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, 3, 40, enemSprites[0], 5, "slime")
+
+class Fireball(Projectile):
+    def __init__(self, x, y, vx, vy):
+        super().__init__(x, y, 5, 20, piuSprite, vx, vy, 2)
 
 def readWorldData(name):
     worldfile = open(name,"r").readlines()
@@ -341,7 +347,8 @@ def renderUI():
 worldfile = readWorldData("world.txt")
 background = readWorldData("back.txt")
 
-enemies.append(Slime(100, 100))
+sas = Slime(100, 100)
+entities.append(sas)
 
 while True:
     for event in pygame.event.get():
@@ -401,8 +408,8 @@ while True:
         if pygame.mouse.get_pressed()[2] and not primaryCooldown:
 
             px, py = getNormDir(CHAR_X, CHAR_Y, mouse_x, mouse_y)
-            p = Projectile(gx, gy, 5, 20, piuSprite, px, py)
-            proyectiles.append(p)
+            p = Fireball(gx, gy, px, py)
+            entities.append(p)
             primaryCooldown = 45
             #cambiarBloque(cell_x, cell_y, bloqueSeleccionado, False)
 
@@ -435,20 +442,23 @@ while True:
             else:
                 WIN.blit(worldSprites[block], (x * GRID_SIZE, y * GRID_SIZE))
 
-    for p in proyectiles:
-        p.draw(WIN)
-        if p.checkCol(enemies):
-            proyectiles.remove(p)
-    
-    for e in enemies:
-        ex , ey = e.coords()
-        if abs( ex - gx) <= e.size and abs(ey - gy) <= e.size:
-            if not dmgCooldown:
-                applyDmg()
-                dmgCooldown = 30
-        if e.vida < 1:
-            enemies.remove(e)
+
+    for e in entities:
+        if e.type == "projectile":
+            if e.checkCol(entities):
+                entities.remove(e)
+        elif e.type == "enemy":
+            ex , ey = e.coords()
+            if e.vida < 1:
+                entities.remove(e)
+            else:
+                if abs(ex - gx) <= e.size and abs(ey - gy) <= e.size:
+                    if not dmgCooldown:
+                        applyDmg()
+                        dmgCooldown = 30
+        
         e.draw(WIN)
+        
 
     # Dibuja el personaje
     WIN.blit(spritepj,(CHAR_X, CHAR_Y, CHAR_SIZE, CHAR_SIZE))
