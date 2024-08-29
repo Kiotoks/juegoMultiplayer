@@ -73,21 +73,30 @@ fps = 70
 
 spritepj = pygame.image.load(f'{cwd}/files/sprites/sprite.png')
 spritepj = pygame.transform.scale(spritepj, (CHAR_SIZE, CHAR_SIZE))
+piuSprite = pygame.image.load(f'{cwd}/files/sprites/projectile.png')
 
 
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
 
-
-class Projectile:
-    def __init__(self, x, y, vx, vy, v, size, color):
+class Entity():
+    def __init__(self, x, y, v, size, sprite, type):
         self.x = x
         self.y = y
+        self.size = size
+        self.v = v
+        self.sprite = sprite
+        self.type = type
+
+    def talk(self):
+        print(self.type)
+
+class Projectile(Entity):
+    def __init__(self, x, y, v, size, sprite, vx, vy):
+        self.sprite = pygame.transform.scale(sprite, (size, size))
+        super().__init__(x, y, v, size, self.sprite, "projectile")
         self.vx = vx
         self.vy = vy
-        self.size = size
-        self.color = color
-        self.v = v
 
     def update(self):
         self.x += self.vx * self.v
@@ -106,22 +115,17 @@ class Projectile:
                 e.applyDmg()
                 return True
             
-
     def draw(self, screen):
         self.update()
-        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.size)
+        screen.blit(self.sprite,(self.x, self.y, self.size, self.size))
 
 
-class Enemy:
-    def __init__(self, x, y, v, size, type, color, enemSprites, vida):
-        self.x = x
-        self.y = y
-        self.size = size
-        self.type = type
-        self.color = color
+class Enemy(Entity):
+    def __init__(self, x, y, v, size, sprite, vida, name):
+        super().__init__(x, y, v, size, sprite, "enemy")
+        self.name = name
         self.vida = vida
-        self.v = v
-        self.sprite = enemSprites[type]
+        self.sprite = sprite
         self.cooldown = 0
     
     def applyDmg(self):
@@ -130,7 +134,6 @@ class Enemy:
             self.cooldown = 5
         print(self.vida)
         
-
     def coords(self):
         return self.x + self.size/2, self.y + self.size/2
 
@@ -140,8 +143,8 @@ class Enemy:
             self.cooldown -= 1
 
 class Slime(Enemy):
-    def __init__(self, x, y, enemSprites):
-        super().__init__(x, y, 3, 40, 0, (255, 255, 255), enemSprites, 5)
+    def __init__(self, x, y):
+        super().__init__(x, y, 3, 40, enemSprites[0], 5, "slime")
 
 def readWorldData(name):
     worldfile = open(name,"r").readlines()
@@ -338,7 +341,7 @@ def renderUI():
 worldfile = readWorldData("world.txt")
 background = readWorldData("back.txt")
 
-enemies.append(Slime(100, 100, enemSprites))
+enemies.append(Slime(100, 100))
 
 while True:
     for event in pygame.event.get():
@@ -398,7 +401,7 @@ while True:
         if pygame.mouse.get_pressed()[2] and not primaryCooldown:
 
             px, py = getNormDir(CHAR_X, CHAR_Y, mouse_x, mouse_y)
-            p = Projectile(gx, gy, px, py, 5, 10, (255,255,255))
+            p = Projectile(gx, gy, 5, 20, piuSprite, px, py)
             proyectiles.append(p)
             primaryCooldown = 45
             #cambiarBloque(cell_x, cell_y, bloqueSeleccionado, False)
