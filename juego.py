@@ -27,6 +27,7 @@ worldfile = []
 blockSounds = []
 worldSprites = []
 enemSprites = []
+bufferMensajes = []
 
 cwd = os.getcwd()
 
@@ -53,6 +54,8 @@ CHAR_SPEED = 3
 CHAR_VX = 0
 CHAR_VY = 0
 VIDA = 10
+
+cantEnemigos = 0
 
 online = False
 movimiento = False
@@ -121,12 +124,12 @@ class Projectile(Entity):
         self.update()
         screen.blit(self.sprite,(self.x, self.y, self.size, self.size))
 
-
 class Enemy(Entity):
-    def __init__(self, x, y, v, size, sprite, vida, name):
+    def __init__(self, x, y, v, size, sprite, vida, name, id):
         super().__init__(x, y, v, size, sprite, "enemy")
         self.name = name
         self.vida = vida
+        self.id = id
         self.sprite = sprite
         self.cooldown = 0
     
@@ -140,13 +143,19 @@ class Enemy(Entity):
         return self.x + self.size/2, self.y + self.size/2
 
     def draw(self, screen):
+        self. x+= 1
         screen.blit(self.sprite,(self.x, self.y, self.size, self.size))
         if self.cooldown > 0:
             self.cooldown -= 1
 
+class Player(Entity):
+    def __init__(self, x, y, size, sprite, id, name, vida, vidamax, skin, armor, tools, inv):
+        super().__init__(x, y, 0, size, sprite, "player")
+        self.id, self.name, self.vida, self.vidamax, self.skin, self.armor, self.tools, self.inv = id, name, vida, vidamax, skin, armor, tools, inv
+
 class Slime(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, 3, 40, enemSprites[0], 5, "slime")
+    def __init__(self, x, y, id):
+        super().__init__(x, y, 3, 40, enemSprites[0], 5, "slime", id)
 
 class Fireball(Projectile):
     def __init__(self, x, y, vx, vy):
@@ -183,7 +192,7 @@ def cambiarBloque(x, y , id, out):
         pygame.mixer.Sound.play(blockSounds[id])
         worldfile[y][x] = id
         if not out :
-            bufferBloques.append({"x":x, "y":y, "id":id})
+            bufferMensajes.append({"bloque":{"x":x, "y":y, "id":id}})
 
 def chequearColisionAxis(futuro_x, futuro_y):
     future_grid_corners = [
@@ -200,15 +209,16 @@ def chequearColisionAxis(futuro_x, futuro_y):
 
 def enviar(cliente):
     delay = 1/(fps)
+    global bufferMensajes
     while True:
         try:
-            mensaje = {"pos":{"x":0,"y":0}}
+            mensaje = {"events": []}
+            mensaje["events"].append({"pos":{"x":CHAR_X,"y":CHAR_Y}})
 
-            if bufferBloques:
-                mensaje["bloque"] = bufferBloques[0]
-                bufferBloques.pop(0)
-
-            mensaje["pos"] = {"x": CHAR_X, "y":CHAR_Y}
+            for m in bufferMensajes:
+                mensaje["events"].append(m)
+            
+            bufferMensajes = []
 
             cliente.send(json.dumps(mensaje).encode('utf-8'))
             
@@ -242,16 +252,35 @@ def recibir(server):
                     # Intentar cargar un objeto JSON desde el buffer
                     json_data, index = json.JSONDecoder().raw_decode(buffer)
                     buffer = buffer[index:].lstrip()
-                    
-                    # Procesar el objeto JSON
-                    if "bloque" in json_data:
-                        bloque = json_data["bloque"]
-                        cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
-                    
-                    if "pos" in json_data:
-                        pos = json_data["pos"]
-                        SCX = pos["x"]
-                        SCY = pos["y"]
+                    mensajes = json_data["events"]
+
+                    for m in mensajes:
+                        # Procesar el objeto JSON
+                        if "bloque" in m:
+                            bloque = m["bloque"]
+                            cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
+                        
+                        elif "pos" in m:
+                            pos = m["pos"]
+                            SCX = pos["x"]
+                            SCY = pos["y"]
+
+                        elif "projectile" in m:
+                            p = m["projectile"]
+                            entities.append(Fireball(p["x"], p["y"], p["vx"], p["vy"]))
+                        
+                        elif "enemy" in m:
+                            e = m["enemy"]
+                            encontrado = False
+                            for en in entities:
+                                if en.type == "enemy" and en.id == e["id"]:
+                                    en.x = e["x"]
+                                    en.y = e["y"]
+                                    print("encontrado")
+                                    encontrado = True
+                            if not encontrado:
+                                entities.append(Slime(e["x"], e["y"], e["id"]))
+
                 
                 except json.JSONDecodeError:
                     # Si no se puede decodificar más, salir del bucle interno
@@ -277,8 +306,9 @@ def atenderClientes(server):
             cliente, direccion = server.accept()
             print(f"[CONEXIÓN] Cliente conectado desde {direccion}")
 
-            clientes.append(cliente)
 
+            clientes.append(cliente)
+            
             # Crea un hilo para atender al cliente
             hilo_enviar = threading.Thread(target=enviar, args=(cliente,))
             hilo_enviar.start()
@@ -344,11 +374,23 @@ def renderUI():
     text = font.render(f"Life: {VIDA}", True, color)
     WIN.blit(text, (10, 10)) 
 
+def disparar(pro, x, y, vx, vy):
+    global cantEnemigos
+    match pro:
+        case "fireball":
+            p = Fireball(x, y, vx, vy)
+            bufferMensajes.append({"projectile":{"x": x, "y": y, "vx": vx, "vy": vy}})
+            entities.append(p)
+        case "slime":
+            s = Slime(300, 300, cantEnemigos)
+            bufferMensajes.append({"enemy":{"x": 300, "y": 300, "id": cantEnemigos}})
+            entities.append(s)
+            cantEnemigos += 1
+            
+
 worldfile = readWorldData("world.txt")
 background = readWorldData("back.txt")
 
-sas = Slime(100, 100)
-entities.append(sas)
 
 while True:
     for event in pygame.event.get():
@@ -408,8 +450,7 @@ while True:
         if pygame.mouse.get_pressed()[2] and not primaryCooldown:
 
             px, py = getNormDir(CHAR_X, CHAR_Y, mouse_x, mouse_y)
-            p = Fireball(gx, gy, px, py)
-            entities.append(p)
+            disparar("slime", gx, gy, px, py)
             primaryCooldown = 45
             #cambiarBloque(cell_x, cell_y, bloqueSeleccionado, False)
 
