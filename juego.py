@@ -91,7 +91,8 @@ class Fireball(classes.Projectile):
         super().__init__(x, y, 5, 20, piuSprite, vx, vy, 2)
 
 def readWorldData(name):
-    worldfile = open(name,"r").readlines()
+    global cwd
+    worldfile = open(cwd+"/files/saves/"+name+".txt","r").readlines()
     for i in range(len(worldfile)):
         worldfile[i] = worldfile[i][:-1]
         worldfile[i] = list(worldfile[i])
@@ -228,6 +229,15 @@ def renderUI():
     text = font.render(f"Life: {VIDA}", True, color)
     WIN.blit(text, (10, 10)) 
 
+def crearHabitacion(): #solo debug
+    with open(f"{cwd}/files/saves/room.txt", "w") as file:
+        for row in worldfile:
+            strRow = ""
+            for number in row:
+                strRow += str(number)
+
+            file.write(strRow + "\n")
+
 def disparar(pro, x, y, vx, vy):
     global cantEnemigos
     match pro:
@@ -241,11 +251,10 @@ def disparar(pro, x, y, vx, vy):
             entities.append(s)
             cantEnemigos += 1
             
-
-worldfile = readWorldData("world.txt")
-background = readWorldData("back.txt")
+worldfile = readWorldData("world")
+background = readWorldData("back")
 #disparar("slime",500, 500, 0,0)
-
+guardado = False
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -259,6 +268,11 @@ while True:
     if keys[pygame.K_m] and not online:
         abrirServidor()
         online = True
+    if keys[pygame.K_g] and not guardado:
+        crearHabitacion()
+        guardado = True
+    if keys[pygame.K_o]:
+        worldfile = readWorldData("room")
 
     if VIDA:
         if keys[pygame.K_w]:
@@ -313,7 +327,7 @@ while True:
 
         elif pygame.mouse.get_pressed()[0]:
 
-            cambiarBloque(cell_x, cell_y, 0, False)
+            cambiarBloque(cell_x, cell_y, 2, False)
 
         movimiento = False
     
