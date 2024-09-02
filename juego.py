@@ -1,17 +1,12 @@
 import pygame
 import sys
 import math
-import socket
 import threading
-import json
-import time
 import os
+import time
 import generacionProcedural as gp
-
-print(gp.generarDungeon(5, 10, 10))
-
-HOST = "localhost"  # Dirección del servidor
-PORT = 8000  # Puerto del servidor
+import classes
+import network as nt
 
 # Inicializa Pygame
 pygame.init()
@@ -21,7 +16,8 @@ GRID_WIDTH = 30
 GRID_HEIGHT = 20
 
 WIDTH, HEIGHT = GRID_WIDTH * GRID_SIZE, GRID_HEIGHT * GRID_WIDTH
-
+classes.setDim(HEIGHT, WIDTH)
+ 
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Survival")
 
@@ -71,7 +67,6 @@ timeout = 0
 
 bloqueSeleccionado = 2
 
-clientes = []
 bufferBloques = []
 proyectiles = []
 entities = []
@@ -87,85 +82,11 @@ piuSprite = pygame.image.load(f'{cwd}/files/sprites/projectile.png')
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
 
-class Entity():
-    def __init__(self, x, y, v, size, sprite, type):
-        self.x = x
-        self.y = y
-        self.size = size
-        self.v = v
-        self.sprite = sprite
-        self.type = type
-
-    def talk(self):
-        print(self.type)
-
-class Projectile(Entity):
-    def __init__(self, x, y, v, size, sprite, vx, vy, dmg):
-        self.sprite = pygame.transform.scale(sprite, (size, size))
-        super().__init__(x, y, v, size, self.sprite, "projectile")
-        self.vx = vx
-        self.vy = vy
-        self.dmg = dmg
-
-    def update(self):
-        self.x += self.vx * self.v
-        self.y += self.vy * self.v
-
-    def checkCol(self, entities):
-        if self.x > WIDTH or self.x < 0:
-            return True
-        if self.y > HEIGHT or self.y < 0:
-            return True
-        if getBlockInGrid(*cambiarCoordsAGrid(self.x, self.y)):
-            return True
-        for e in entities:
-            if e.type == "enemy":
-                ex , ey = e.coords()
-                bufferMensajes.append({"hit":{"enemy": e.id}})
-                if abs( ex - self.x) <= e.size and abs(ey - self.y) <= e.size:
-                    e.applyDmg(self.dmg)
-                    return True
-            
-    def draw(self, screen):
-        self.update()
-        screen.blit(self.sprite,(self.x, self.y, self.size, self.size))
-
-class Enemy(Entity):
-    def __init__(self, x, y, v, size, sprite, vida, name, id):
-        super().__init__(x, y, v, size, sprite, "enemy")
-        self.name = name
-        self.vida = vida
-        self.id = id
-        self.sprite = sprite
-        self.cooldown = 0
-    
-    def applyDmg(self, dmg):
-        if self.vida > 0 and not self.cooldown:
-            self.vida -= math.trunc(dmg)
-            self.cooldown = 5
-        print(self.vida)
-        
-    def coords(self):
-        return self.x + self.size/2, self.y + self.size/2
-
-    def draw(self, screen):
-        if isHost:
-            self. x+= 1 #para pruebas, eliminar desp
-            bufferMensajes.append({"enemy":{"x": self.x, "y": self.y, "id": self.id}})
-        if self.cooldown > 0:
-            self.cooldown -= 1
-        screen.blit(self.sprite,(self.x, self.y, self.size, self.size))
-
-class Player(Entity):
-    def __init__(self, x, y, size, sprite, id, name, vida, vidamax, skin, armor, tools, inv):
-        super().__init__(x, y, 0, size, sprite, "player")
-        self.id, self.name, self.vida, self.vidamax, self.skin, self.armor, self.tools, self.inv = id, name, vida, vidamax, skin, armor, tools, inv
-
-class Slime(Enemy):
+class Slime(classes.Enemy):
     def __init__(self, x, y, id):
         super().__init__(x, y, 3, 40, enemSprites[0], 5, "slime", id)
 
-class Fireball(Projectile):
+class Fireball(classes.Projectile):
     def __init__(self, x, y, vx, vy):
         super().__init__(x, y, 5, 20, piuSprite, vx, vy, 2)
 
@@ -215,141 +136,6 @@ def chequearColisionAxis(futuro_x, futuro_y):
             return True
     return False
 
-def enviar(cliente):
-    delay = 1/(fps)
-    global bufferMensajes
-    while True:
-        try:
-            mensaje = {"events": []}
-            mensaje["events"].append({"pos":{"x":CHAR_X,"y":CHAR_Y}})
-
-            for m in bufferMensajes:
-                mensaje["events"].append(m)
-            
-            bufferMensajes = []
-
-            cliente.send(json.dumps(mensaje).encode('utf-8'))
-            
-        except Exception as e:
-            print("error enviando")
-            print(mensaje)
-            print(e)
-            # Si hay un error, cierra la conexión con el cliente
-            cliente.close()
-            for i in range(0, len(clientes)):
-                if cliente == clientes[i]:
-                    clientes.pop(i)
-            break
-        time.sleep(delay)
-
-def recibir(server):
-    delay = 1 / fps
-    global SCX
-    global SCY
-    buffer = ""
-    
-    while True:
-        try:
-            # Recibir datos del servidor
-            data = server.recv(1024).decode('utf-8')
-            buffer += data
-            
-            # Procesar los datos en el buffer
-            while True:
-                try:
-                    # Intentar cargar un objeto JSON desde el buffer
-                    json_data, index = json.JSONDecoder().raw_decode(buffer)
-                    buffer = buffer[index:].lstrip()
-                    mensajes = json_data["events"]
-
-                    for m in mensajes:
-                        # Procesar el objeto JSON
-                        if "bloque" in m:
-                            bloque = m["bloque"]
-                            cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
-                        
-                        elif "pos" in m:
-                            pos = m["pos"]
-                            SCX = pos["x"]
-                            SCY = pos["y"]
-
-                        elif "projectile" in m:
-                            p = m["projectile"]
-                            entities.append(Fireball(p["x"], p["y"], p["vx"], p["vy"]))
-                        
-                        elif "enemy" in m:
-                            e = m["enemy"]
-                            encontrado = False
-                            if not isHost:
-                                for en in entities:
-                                    if en.type == "enemy" and en.id == e["id"]:
-                                        en.x = e["x"]
-                                        en.y = e["y"]
-                                        print("encontrado")
-                                        encontrado = True
-                                if not encontrado:
-                                    entities.append(Slime(e["x"], e["y"], e["id"]))
-
-                
-                except json.JSONDecodeError:
-                    # Si no se puede decodificar más, salir del bucle interno
-                    break
-            
-        except Exception as e:
-            print("error recibiendo:", buffer)
-            print(e)
-            # Si hay un error, cierra la conexión con el servidor
-            server.close()
-            for i in range(len(clientes)):
-                if server == clientes[i]:
-                    clientes.pop(i)
-            break
-        
-        time.sleep(delay)
-
-
-def atenderClientes(server):
-    print("arranca a atender clientes")
-    while True:
-        try:
-            cliente, direccion = server.accept()
-            print(f"[CONEXIÓN] Cliente conectado desde {direccion}")
-
-
-            clientes.append(cliente)
-            
-            # Crea un hilo para atender al cliente
-            hilo_enviar = threading.Thread(target=enviar, args=(cliente,))
-            hilo_enviar.start()
-            hilo_recibir= threading.Thread(target=recibir, args=(cliente,))
-            hilo_recibir.start()
-        except:
-            print("error 1")
-
-def abrirServidor():
-    bufferBloques = []
-    global isHost
-    try:
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Crea un socket TCP
-        server.bind((HOST, PORT))  # Asocia el socket a la dirección y puerto
-        server.settimeout(60)
-        server.listen(5)  # Pone el socket en modo escucha
-        print("[SERVIDOR] Servidor iniciado")
-        isHost = True
-        listener = threading.Thread(target=atenderClientes, args=(server,))
-        listener.start()
-    except:
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Crea un socket TCP
-        server.connect((HOST, PORT))
-        server.settimeout(60)  # Se conecta al servidor
-        listener = threading.Thread(target=recibir, args=(server,))
-        sender = threading.Thread(target=enviar, args=(server,))
-        fps = 70
-        listener.start()
-        sender.start()
-        print("Servidor ya iniciado, modo cliente")
-        return
-
 def getNormDir(x1, y1, x2, y2):
     # Step 1: Calculate the direction vector
     dx = x2 - x1
@@ -364,6 +150,63 @@ def getNormDir(x1, y1, x2, y2):
 
     return dx, dy
 
+def enviar():
+    delay = 1/(fps)
+    global bufferMensajes
+    while True:
+        nt.enviar(CHAR_X, CHAR_Y, bufferMensajes)
+        bufferMensajes = []
+        time.sleep(delay)
+
+def handleMsg(msg):
+# Procesar el objeto JSON
+    global SCX, SCY
+    print(msg)
+    if "bloque" in msg:
+        bloque = msg["bloque"]
+        cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
+    
+    elif "pos" in msg:
+        pos = msg["pos"]
+        SCX = pos["x"]
+        SCY = pos["y"]
+
+    elif "projectile" in msg:
+        p = msg["projectile"]
+        entities.append(Fireball(p["x"], p["y"], p["vx"], p["vy"]))
+    
+    elif "enemy" in msg:
+        e = msg["enemy"]
+        encontrado = False
+        if not isHost:
+            for en in entities:
+                if en.type == "enemy" and en.id == e["id"]:
+                    en.x = e["x"]
+                    en.y = e["y"]
+                    print("encontrado")
+                    encontrado = True
+            if not encontrado:
+                entities.append(Slime(e["x"], e["y"], e["id"]))
+
+def recibir():
+    delay = 1 / fps
+    while True:
+        time.sleep(delay)
+        mensajes = nt.recibir()
+        if mensajes != None:
+            for m in mensajes:
+                handleMsg(m)
+    pass
+
+def abrirServidor():
+    role = nt.abrirServidor()
+    if role == "server":
+        isHost = True
+    
+    hilo_enviar = threading.Thread(target=enviar)
+    hilo_enviar.start()
+    hilo_recibir= threading.Thread(target=recibir)
+    hilo_recibir.start()
 
 def die():
     global CHAR_X, CHAR_Y, HEIGHT, WIDTH, VIDA
@@ -401,7 +244,7 @@ def disparar(pro, x, y, vx, vy):
 
 worldfile = readWorldData("world.txt")
 background = readWorldData("back.txt")
-
+#disparar("slime",500, 500, 0,0)
 
 while True:
     for event in pygame.event.get():
@@ -500,7 +343,8 @@ while True:
 
     for e in entities:
         if e.type == "projectile":
-            if e.checkCol(entities):
+            col = e.checkCol(entities, getBlockInGrid(*cambiarCoordsAGrid(e.x, e.y)))
+            if col:
                 entities.remove(e)
         elif e.type == "enemy":
             ex , ey = e.coords()
@@ -512,7 +356,9 @@ while True:
                         applyDmg()
                         dmgCooldown = 30
         
-        e.draw(WIN)
+        msg = e.draw(WIN, isHost)
+        if msg != None:
+            bufferMensajes.append(msg)
         
 
     # Dibuja el personaje

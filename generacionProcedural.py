@@ -1,17 +1,11 @@
-
 import math
 import random
-import os
 
 # Inicializa Pygame
 
 # Configura las dimensiones de la ventana
-
-GRID_SIZE = 80
 GRID_WIDTH = 10  # Ancho del mundo en celdas
 GRID_HEIGHT = 10  # Alto del mundo en celdas
-
-cwd = os.getcwd()
 
 def getCompatibles(tileSides):
     global tiles
@@ -59,11 +53,9 @@ for i in range(GRID_HEIGHT):
 
 grid[math.trunc(GRID_HEIGHT/2)][math.trunc(GRID_WIDTH/2)] = tiles[0]
 
-LIFE = 4
+LIFE = 10
 END_PLACED = False
 sidecoords = [[-1,0], [0,1], [1,0], [0,-1]]
-Seguir = True
-completado = True
 
 def llenarMatriz(width, height):
     grid = []
@@ -79,13 +71,14 @@ def generarDungeon(life, width, height):
     llenarMatriz(width, height)
     LIFE = life
 
-    for i in range(LIFE): # cambiar for por un while donde la vida se descuente como en el codigo original
+    while LIFE > 0: # cambiar for por un while donde la vida se descuente como en el codigo original
         placeList= []
         for i in range(GRID_HEIGHT):
             for j in range(GRID_WIDTH):
                 cell = grid[i][j]
                 if cell != None:
                     placeList.append([i,j])
+                    print(j, i)
                     grid[i][j]["end"] = True
                         
         for cellPos in placeList:
@@ -97,9 +90,9 @@ def generarDungeon(life, width, height):
                 r = random.randint(1,4)
                 if r == 1:
                     if grid[ny][nx] == None:
-                        grid[ny][nx] = tiles[0] #descontar vida solo aca
+                        grid[ny][nx] = tiles[0]
+                        LIFE -= 1 #descontar vida solo aca
     
-    showGrid()
 
     for i in range(GRID_HEIGHT):
         for j in range(GRID_WIDTH):
