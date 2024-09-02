@@ -1,9 +1,10 @@
-
+import pygame
 import math
 import random
 import os
 
 # Inicializa Pygame
+pygame.init()
 
 # Configura las dimensiones de la ventana
 
@@ -11,25 +12,26 @@ GRID_SIZE = 80
 GRID_WIDTH = 10  # Ancho del mundo en celdas
 GRID_HEIGHT = 10  # Alto del mundo en celdas
 
+WIDTH, HEIGHT = GRID_WIDTH * GRID_SIZE, GRID_HEIGHT * GRID_SIZE
+
+WIN = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Movimiento en Grilla con Cámara")
+
+images = []
+
 cwd = os.getcwd()
+
+for i in range(16):
+    images.append(pygame.image.load(f'{cwd}/files/maptiles/tile{i}.png'))
+    images[i] = pygame.transform.scale(images[i], (GRID_SIZE, GRID_SIZE))
+
+clock = pygame.time.Clock()
 
 def getCompatibles(tileSides):
     global tiles
     for tile in tiles:
         if tile["sides"] == tileSides:
             return tile
-
-def showGrid():
-    cont = 0
-    for i in range(GRID_HEIGHT):
-        row = []
-        for j in range(GRID_WIDTH):
-            sas = grid[i][j] != None
-            if sas:
-                cont += 1
-            row.append(sas)
-        print(row)
-    print(cont)
 
 tiles = []
 tiles.append({"img":15,"sides": [0,0,0,0],"name": "BLANK", "end": False})
@@ -59,27 +61,15 @@ for i in range(GRID_HEIGHT):
 
 grid[math.trunc(GRID_HEIGHT/2)][math.trunc(GRID_WIDTH/2)] = tiles[0]
 
-LIFE = 4
+LIFE = 10
 END_PLACED = False
 sidecoords = [[-1,0], [0,1], [1,0], [0,-1]]
 Seguir = True
 completado = True
 
-def llenarMatriz(width, height):
-    grid = []
-    for i in range(width):
-        row = []
-        for j in range(height):
-            row.append(None)
-        grid.append(row)
-
-
-def generarDungeon(life, width, height):
-
-    llenarMatriz(width, height)
-    LIFE = life
-
-    for i in range(LIFE): # cambiar for por un while donde la vida se descuente como en el codigo original
+while True:
+    WIN.fill((0, 0, 0))
+    if Seguir:
         placeList= []
         for i in range(GRID_HEIGHT):
             for j in range(GRID_WIDTH):
@@ -91,29 +81,46 @@ def generarDungeon(life, width, height):
         for cellPos in placeList:
             y, x = cellPos
             cellValue = grid[y][x]
+            econtrado = False
             for sideIndex in range(len(cellValue["sides"])):
                 nx = x + sidecoords[sideIndex][1]
                 ny = y + sidecoords[sideIndex][0]
                 r = random.randint(1,4)
                 if r == 1:
                     if grid[ny][nx] == None:
-                        grid[ny][nx] = tiles[0] #descontar vida solo aca
-    
-    showGrid()
+                        grid[ny][nx] = tiles[0]
+                        LIFE -= 1
+        if LIFE < 0:
+            Seguir = False
+    elif completado:
+        for i in range(GRID_HEIGHT):
+            for j in range(GRID_WIDTH):
+                cell = grid[i][j]
+                if cell != None:
+                    sides = []
+                    for sideIndex in range(len(cell["sides"])):
+                        nx = j + sidecoords[sideIndex][1]
+                        ny = i + sidecoords[sideIndex][0]
+                        nbCell = grid[ny][nx]
+                        if nbCell != None:
+                            sides.append(1)
+                        else:
+                            sides.append(0)
+                    grid[i][j] = getCompatibles(sides)
+        completado = False
+                            
+                    
+        
 
-    for i in range(GRID_HEIGHT):
-        for j in range(GRID_WIDTH):
-            cell = grid[i][j]
-            if cell != None:
-                sides = []
-                for sideIndex in range(len(cell["sides"])):
-                    nx = j + sidecoords[sideIndex][1]
-                    ny = i + sidecoords[sideIndex][0]
-                    nbCell = grid[ny][nx]
-                    if nbCell != None:
-                        sides.append(1)
-                    else:
-                        sides.append(0)
-                grid[i][j] = getCompatibles(sides)
+    for y in range(GRID_HEIGHT):
+        for x in range(GRID_WIDTH):
+            cellvalue = grid[y][x]
+            if cellvalue:
+                WIN.blit(images[cellvalue["img"]], (x * GRID_SIZE, y * GRID_SIZE))
+
+                
+    pygame.display.flip()
+    # Actualiza la pantalla
     
-    return grid
+    # Controla los FPS
+    clock.tick(3)  # Ajusta los FPS según lo necesites

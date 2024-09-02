@@ -6,6 +6,9 @@ import threading
 import json
 import time
 import os
+import generacionProcedural as gp
+
+print(gp.generarDungeon(5, 10, 10))
 
 HOST = "localhost"  # Dirección del servidor
 PORT = 8000  # Puerto del servidor
