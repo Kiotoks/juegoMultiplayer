@@ -58,6 +58,8 @@ VIDA = 10
 cantEnemigos = 0
 
 online = False
+isHost = False
+
 movimiento = False
 
 dmgCooldown = 0
@@ -116,6 +118,7 @@ class Projectile(Entity):
         for e in entities:
             if e.type == "enemy":
                 ex , ey = e.coords()
+                bufferMensajes.append({"hit":{"enemy": e.id}})
                 if abs( ex - self.x) <= e.size and abs(ey - self.y) <= e.size:
                     e.applyDmg(self.dmg)
                     return True
@@ -143,10 +146,12 @@ class Enemy(Entity):
         return self.x + self.size/2, self.y + self.size/2
 
     def draw(self, screen):
-        self. x+= 1
-        screen.blit(self.sprite,(self.x, self.y, self.size, self.size))
+        if isHost:
+            self. x+= 1 #para pruebas, eliminar desp
+            bufferMensajes.append({"enemy":{"x": self.x, "y": self.y, "id": self.id}})
         if self.cooldown > 0:
             self.cooldown -= 1
+        screen.blit(self.sprite,(self.x, self.y, self.size, self.size))
 
 class Player(Entity):
     def __init__(self, x, y, size, sprite, id, name, vida, vidamax, skin, armor, tools, inv):
@@ -272,14 +277,15 @@ def recibir(server):
                         elif "enemy" in m:
                             e = m["enemy"]
                             encontrado = False
-                            for en in entities:
-                                if en.type == "enemy" and en.id == e["id"]:
-                                    en.x = e["x"]
-                                    en.y = e["y"]
-                                    print("encontrado")
-                                    encontrado = True
-                            if not encontrado:
-                                entities.append(Slime(e["x"], e["y"], e["id"]))
+                            if not isHost:
+                                for en in entities:
+                                    if en.type == "enemy" and en.id == e["id"]:
+                                        en.x = e["x"]
+                                        en.y = e["y"]
+                                        print("encontrado")
+                                        encontrado = True
+                                if not encontrado:
+                                    entities.append(Slime(e["x"], e["y"], e["id"]))
 
                 
                 except json.JSONDecodeError:
@@ -319,12 +325,14 @@ def atenderClientes(server):
 
 def abrirServidor():
     bufferBloques = []
+    global isHost
     try:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Crea un socket TCP
         server.bind((HOST, PORT))  # Asocia el socket a la dirección y puerto
         server.settimeout(60)
         server.listen(5)  # Pone el socket en modo escucha
         print("[SERVIDOR] Servidor iniciado")
+        isHost = True
         listener = threading.Thread(target=atenderClientes, args=(server,))
         listener.start()
     except:
@@ -450,9 +458,12 @@ while True:
         if pygame.mouse.get_pressed()[2] and not primaryCooldown:
 
             px, py = getNormDir(CHAR_X, CHAR_Y, mouse_x, mouse_y)
-            disparar("slime", gx, gy, px, py)
+            if isHost:
+                disparar("slime", gx, gy, px, py)
+            else:
+                disparar("fireball", gx, gy, px, py)
             primaryCooldown = 45
-            #cambiarBloque(cell_x, cell_y, bloqueSeleccionado, False)
+
 
         elif pygame.mouse.get_pressed()[0]:
 

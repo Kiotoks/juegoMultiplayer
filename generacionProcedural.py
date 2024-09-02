@@ -1,7 +1,7 @@
 import pygame
-import sys
 import math
 import random
+import os
 
 # Inicializa Pygame
 pygame.init()
@@ -19,8 +19,10 @@ pygame.display.set_caption("Movimiento en Grilla con Cámara")
 
 images = []
 
+cwd = os.getcwd()
+
 for i in range(16):
-    images.append(pygame.image.load(f'tile{i}.png'))
+    images.append(pygame.image.load(f'{cwd}/files/maptiles/tile{i}.png'))
     images[i] = pygame.transform.scale(images[i], (GRID_SIZE, GRID_SIZE))
 
 clock = pygame.time.Clock()
