@@ -38,7 +38,6 @@ class Projectile(Entity):
         if self.y > HEIGHT or self.y < 0:
             return True
         if bloque:
-            print("habia bloque")
             return True
         for e in entities:
             if e.type == "enemy":
@@ -64,7 +63,7 @@ class Enemy(Entity):
         if self.vida > 0 and not self.cooldown:
             self.vida -= math.trunc(dmg)
             self.cooldown = 5
-        print(self.vida)
+        print(f"id:{self.id} vida:{ self.vida}")
         
     def coords(self):
         return self.x + self.size/2, self.y + self.size/2

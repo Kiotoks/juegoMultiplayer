@@ -30,13 +30,13 @@ bufferMensajes = []
 
 cwd = os.getcwd()
 
-for i in range(3):
+for i in range(7):
     worldSprites.append(pygame.image.load(f'{cwd}/files/sprites/cell{i}.png'))
     worldSprites[i] = pygame.transform.scale(worldSprites[i], (GRID_SIZE, GRID_SIZE))
 
-for i in range(3):
+"""for i in range(3):
     blockSounds.append(pygame.mixer.Sound(f'{cwd}/files/sounds/block{i}.wav'))
-
+"""
 for i in range(1):
     enemSprites.append(pygame.image.load(f'{cwd}/files/sprites/enem{i}.png'))
     enemSprites[i] = pygame.transform.scale(enemSprites[i], (GRID_SIZE, GRID_SIZE))
@@ -64,6 +64,7 @@ movimiento = False
 dmgCooldown = 0
 primaryCooldown = 0
 timeout = 0
+uiCooldown = 0 
 
 bloqueSeleccionado = 2
 
@@ -106,6 +107,10 @@ def readWorldData(name):
 
     return newWorldFile
 
+
+def entrarDungeon():
+    pass
+
 def cambiarCoordsAGrid(x,y):
     return  math.trunc(x/GRID_SIZE) , math.trunc(y/GRID_SIZE)
 
@@ -119,7 +124,7 @@ def cambiarBloque(x, y , id, out):
         if id != 0:
             if abs(x*40 - CHAR_X) <= 40 and abs(y*40 - CHAR_Y) <= 40:
                 return
-        pygame.mixer.Sound.play(blockSounds[id])
+        #pygame.mixer.Sound.play(blockSounds[id])
         worldfile[y][x] = id
         if not out :
             bufferMensajes.append({"bloque":{"x":x, "y":y, "id":id}})
@@ -216,18 +221,23 @@ def die():
     VIDA = 10
 
 def applyDmg():
-    global VIDA
+    global VIDA, dmgCooldown
     if VIDA > 0:
         VIDA -= 1
         print(VIDA)
     if not VIDA:
         die()
+    dmgCooldown = 30
 
 def renderUI():
-    global font, WIN, VIDA
+    global font, WIN, VIDA, bloqueSeleccionado
+    #renderizar vida
     color = (255,255,255)
     text = font.render(f"Life: {VIDA}", True, color)
-    WIN.blit(text, (10, 10)) 
+    WIN.blit(text, (10, 10))
+    #renderizar bloque seleccionado
+    pygame.draw.rect(WIN, (255,255,255), pygame.Rect(17, HEIGHT - 23 - GRID_SIZE, GRID_SIZE+ 6, GRID_SIZE + 6))
+    WIN.blit(worldSprites[bloqueSeleccionado], (20, HEIGHT - 20 - GRID_SIZE))
 
 def crearHabitacion(): #solo debug
     with open(f"{cwd}/files/saves/room.txt", "w") as file:
@@ -264,7 +274,6 @@ while True:
     # Obtén las teclas presionadas
     keys = pygame.key.get_pressed()
     
-    
     if keys[pygame.K_m] and not online:
         abrirServidor()
         online = True
@@ -273,6 +282,17 @@ while True:
         guardado = True
     if keys[pygame.K_o]:
         worldfile = readWorldData("room")
+    
+    if not uiCooldown:
+        if keys[pygame.K_q]:
+            if bloqueSeleccionado > 0:
+                bloqueSeleccionado -= 1
+            uiCooldown = 10
+        if keys[pygame.K_e]:
+            if bloqueSeleccionado < len(worldSprites) - 1:
+                bloqueSeleccionado += 1
+            uiCooldown = 10
+    
 
     if VIDA:
         if keys[pygame.K_w]:
@@ -300,8 +320,13 @@ while True:
         CHAR_VY = 0
     gx = CHAR_X+CHAR_SIZE/2
     gy = CHAR_Y+ CHAR_SIZE/2
-    if getBlockInGrid(*cambiarCoordsAGrid(gx, gy)) == 1 and not dmgCooldown:
+
+    bloqueParado = getBlockInGrid(*cambiarCoordsAGrid(gx, gy))
+    if bloqueParado == 1 and not dmgCooldown:
         applyDmg()
+    
+    if bloqueParado == 6:
+        entrarDungeon()
         dmgCooldown = 30
 
     CHAR_X += CHAR_VX * CHAR_SPEED
@@ -325,9 +350,10 @@ while True:
             primaryCooldown = 45
 
 
+
         elif pygame.mouse.get_pressed()[0]:
 
-            cambiarBloque(cell_x, cell_y, 2, False)
+            cambiarBloque(cell_x, cell_y, bloqueSeleccionado, False)
 
         movimiento = False
     
@@ -337,6 +363,8 @@ while True:
         dmgCooldown -= 1
     if primaryCooldown:
         primaryCooldown -= 1
+    if uiCooldown > 0:
+        uiCooldown -= 1
 
     if event.type == pygame.MOUSEMOTION:
         movimiento = True
@@ -345,6 +373,8 @@ while True:
     CHAR_X = max(0, min(CHAR_X, WIDTH - CHAR_SIZE))
     CHAR_Y = max(0, min(CHAR_Y, HEIGHT - CHAR_SIZE))
 
+    WIN.fill((0,0,0))
+
     # Dibuja el fondo
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
@@ -352,6 +382,7 @@ while True:
             if getBlockInGrid(x,y) == 0:
                 WIN.blit(worldSprites[getBlockInBack(x, y)], (x * GRID_SIZE, y * GRID_SIZE))
             else:
+                WIN.blit(worldSprites[getBlockInBack(x, y)], (x * GRID_SIZE, y * GRID_SIZE))
                 WIN.blit(worldSprites[block], (x * GRID_SIZE, y * GRID_SIZE))
 
 
