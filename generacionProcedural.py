@@ -73,7 +73,10 @@ def fillRooms(grid, ends, level):
     for i in range(GRID_HEIGHT):
         for j in range(GRID_WIDTH):
             cell = grid[i][j]
-            
+            if cell != None:
+                print(cell["room"])
+                if cell["room"] == "":
+                    grid[i][j] = rooms[random.randint(0, len(rooms)-1)]
     return grid
 
 def getSides(cell, i, j):
@@ -154,7 +157,7 @@ def generarDungeon(life, width, height, level):
             grid[ui-1][uj] = tiles[5]
             #actualizar puertas ultima habitacion
             grid[ui][uj] = unicoCompatible = getCompatibles(getSides(primera[2], ui, uj))
-
+            ends.append([ui, uj])
 
     
     print(ends)

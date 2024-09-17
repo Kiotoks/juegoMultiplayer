@@ -78,7 +78,7 @@ bufferBloques = []
 proyectiles = []
 entities = []
 nivel = 0
-
+ronda = 0
 
 font = pygame.font.Font('freesansbold.ttf', 32)
 fps = 70
@@ -107,25 +107,82 @@ def readWorldData(name):
 
 #crear funcion de cargar habitacion que se base por las cordenadas de la dungeon
 #solucionar el tema de tener un solo 
-def cargarHabitacion(nombre):
-    global worldfile, background, cwd
+
+def cambiarBloque(x, y , id, out):
+    if worldfile[y][x] != id:
+        if id != 0:
+            if abs(x*40 - CHAR_X) <= 40 and abs(y*40 - CHAR_Y) <= 40:
+                return
+        #pygame.mixer.Sound.play(blockSounds[id])
+        worldfile[y][x] = id
+        if not out :
+            bufferMensajes.append({"bloque":{"x":x, "y":y, "id":id}})
+
+
+def colocarPuertas(sides):
+    def ponerMuro(x, y):
+        worldfile[y][x] = 0
+
+    bloque = 0
+    print(sides)
+    if sides[0]:
+        ponerMuro(0, math.trunc(GRID_HEIGHT/2))
+        ponerMuro(0, math.trunc(GRID_HEIGHT/2)+1)
+    if sides[1]:
+        ponerMuro(math.trunc(GRID_WIDTH/2), 0)
+        ponerMuro(math.trunc(GRID_WIDTH/2)+1, 0)
+    if sides[2]:
+        ponerMuro(GRID_WIDTH-1, math.trunc(GRID_HEIGHT/2))
+        ponerMuro(GRID_WIDTH-1, math.trunc(GRID_HEIGHT/2)+1)
+    if sides[3]:
+        ponerMuro(math.trunc(GRID_WIDTH/2), GRID_HEIGHT-1)
+        ponerMuro(math.trunc(GRID_WIDTH/2)+1, GRID_HEIGHT)
+
+
+def crearBorde(sides):
+    global worldfile
+    print("ly", len(worldfile))
+    print("lxdw",(worldfile[0]))
+    for y in range(GRID_HEIGHT):
+        for x in range(GRID_WIDTH):
+            print(x, y)
+            if x  ==  0 or y == 0:
+                cambiarBloque(x, y, 2, False)
+            if x  ==  GRID_WIDTH-1 or y == GRID_HEIGHT-1:
+               cambiarBloque(x, y, 2, False)
+    colocarPuertas(sides)
+    
+def cargarEnemigos(enemArray, ronda):
+    global entities, cantEnemigos
+    for e in enemArray[ronda]:
+        if e["name"] == "slime":
+            cantEnemigos += 1
+            entities.append(Slime(e["x"], e["y"], cantEnemigos))
+
+def cargarHabitacion(dy, dx):
+    global worldfile, background, cwd, dungeon, ronda
+    room = dungeon[dy][dx]
+    nombre = room["room"]
     with open(cwd+"/files/data/rooms.json", 'r') as archivo:
         datos = json.load(archivo)
     #añadir spawn de enemigos
     background =  datos[nombre]["background"]
     worldfile = datos[nombre]["foreground"]
+    crearBorde(room["sides"])
+    ronda = 0
+    cargarEnemigos(datos[nombre]["enemiesRounds"], ronda)
 
 def entrarDungeon(lvl):
     global dungeon, CHAR_X, CHAR_Y, DNG_X, DNG_Y
-    CHAR_X, CHAR_Y = 0, 0
+    CHAR_X, CHAR_Y = WIDTH/2, HEIGHT/2
     levels = [(10, 10, 10)] #reemplazar en el futuro por un json
     lvldim = levels[lvl-1]
 
     dungeon, spawn = gp.generarDungeon(lvldim[0],lvldim[1], lvldim[2], lvl)
     
-    DNG_X, DNG_Y = spawn[0], spawn[1]
+    DNG_Y, DNG_X = spawn[0], spawn[1]
     
-    cargarHabitacion("spawn")
+    cargarHabitacion(DNG_Y,DNG_X) 
 
     pass
 
@@ -142,15 +199,6 @@ def getBlockInBack(x,y):
     y = min(y, GRID_HEIGHT-1)
     return int(background[y][x])
 
-def cambiarBloque(x, y , id, out):
-    if worldfile[y][x] != id:
-        if id != 0:
-            if abs(x*40 - CHAR_X) <= 40 and abs(y*40 - CHAR_Y) <= 40:
-                return
-        #pygame.mixer.Sound.play(blockSounds[id])
-        worldfile[y][x] = id
-        if not out :
-            bufferMensajes.append({"bloque":{"x":x, "y":y, "id":id}})
 
 def chequearColisionAxis(futuro_x, futuro_y):
     future_grid_corners = [
