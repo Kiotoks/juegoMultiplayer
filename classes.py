@@ -44,7 +44,7 @@ class Projectile(Entity):
                 ex , ey = e.coords()
                 if abs( ex - self.x) <= e.size and abs(ey - self.y) <= e.size:
                     e.applyDmg(self.dmg)
-                    return {"hit":{"enemy": e.id}}
+                    return {"hit":{"enemy": e.id, "dmg": self.dmg}}
             
     def draw(self, screen, isHost):
         self.update()

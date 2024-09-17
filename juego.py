@@ -3,6 +3,7 @@ import sys
 import math
 import threading
 import os
+import json
 import time
 import generacionProcedural as gp
 import classes
@@ -13,9 +14,11 @@ pygame.init()
 
 GRID_SIZE = 40
 GRID_WIDTH = 30
-GRID_HEIGHT = 20
+GRID_HEIGHT = 15
 
-WIDTH, HEIGHT = GRID_WIDTH * GRID_SIZE, GRID_HEIGHT * GRID_WIDTH
+WIDTH = GRID_WIDTH * GRID_SIZE
+HEIGHT = GRID_HEIGHT * GRID_SIZE
+
 classes.setDim(HEIGHT, WIDTH)
  
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -54,6 +57,9 @@ CHAR_VX = 0
 CHAR_VY = 0
 VIDA = 10
 
+DNG_X = 0
+DNG_Y = 0
+
 cantEnemigos = 0
 
 online = False
@@ -71,6 +77,8 @@ bloqueSeleccionado = 2
 bufferBloques = []
 proyectiles = []
 entities = []
+nivel = 0
+
 
 font = pygame.font.Font('freesansbold.ttf', 32)
 fps = 70
@@ -93,30 +101,45 @@ class Fireball(classes.Projectile):
 
 def readWorldData(name):
     global cwd
-    worldfile = open(cwd+"/files/saves/"+name+".txt","r").readlines()
-    for i in range(len(worldfile)):
-        worldfile[i] = worldfile[i][:-1]
-        worldfile[i] = list(worldfile[i])
+    with open(cwd+"/files/data/world.json", 'r') as archivo:
+        datos = json.load(archivo)
+    return datos[name]
 
-    newWorldFile = []
-    for x in worldfile:
-        newLine = []
-        for y in x:
-            newLine.append(int(y))
-        newWorldFile.append(newLine)
+#crear funcion de cargar habitacion que se base por las cordenadas de la dungeon
+#solucionar el tema de tener un solo 
+def cargarHabitacion(nombre):
+    global worldfile, background, cwd
+    with open(cwd+"/files/data/rooms.json", 'r') as archivo:
+        datos = json.load(archivo)
+    #añadir spawn de enemigos
+    background =  datos[nombre]["background"]
+    worldfile = datos[nombre]["foreground"]
 
-    return newWorldFile
+def entrarDungeon(lvl):
+    global dungeon, CHAR_X, CHAR_Y, DNG_X, DNG_Y
+    CHAR_X, CHAR_Y = 0, 0
+    levels = [(10, 10, 10)] #reemplazar en el futuro por un json
+    lvldim = levels[lvl-1]
 
+    dungeon, spawn = gp.generarDungeon(lvldim[0],lvldim[1], lvldim[2], lvl)
+    
+    DNG_X, DNG_Y = spawn[0], spawn[1]
+    
+    cargarHabitacion("spawn")
 
-def entrarDungeon():
     pass
 
 def cambiarCoordsAGrid(x,y):
     return  math.trunc(x/GRID_SIZE) , math.trunc(y/GRID_SIZE)
 
 def getBlockInGrid(x,y):
+    x = min(x, GRID_WIDTH-1)
+    y = min(y, GRID_HEIGHT-1)
     return int(worldfile[y][x])
+
 def getBlockInBack(x,y):
+    x = min(x, GRID_WIDTH-1)
+    y = min(y, GRID_HEIGHT-1)
     return int(background[y][x])
 
 def cambiarBloque(x, y , id, out):
@@ -189,11 +212,16 @@ def handleMsg(msg):
                 if en.type == "enemy" and en.id == e["id"]:
                     en.x = e["x"]
                     en.y = e["y"]
-                    print("encontrado")
                     encontrado = True
             if not encontrado:
                 entities.append(Slime(e["x"], e["y"], e["id"]))
-
+    
+    elif "hit" in msg:
+        hit = msg["hit"]
+        for en in entities:
+            if en.type == "enemy" and en.id == hit["enemy"]:
+                en.applyDmg(hit["dmg"])
+        
 def recibir():
     delay = 1 / fps
     while True:
@@ -261,8 +289,9 @@ def disparar(pro, x, y, vx, vy):
             entities.append(s)
             cantEnemigos += 1
             
-worldfile = readWorldData("world")
-background = readWorldData("back")
+worldfile = readWorldData("foreground")
+background = readWorldData("background")
+
 #disparar("slime",500, 500, 0,0)
 guardado = False
 while True:
@@ -324,9 +353,9 @@ while True:
     bloqueParado = getBlockInGrid(*cambiarCoordsAGrid(gx, gy))
     if bloqueParado == 1 and not dmgCooldown:
         applyDmg()
-    
-    if bloqueParado == 6:
-        entrarDungeon()
+    elif bloqueParado == 6 and not dmgCooldown:
+        nivel += 1
+        entrarDungeon(nivel)
         dmgCooldown = 30
 
     CHAR_X += CHAR_VX * CHAR_SPEED
@@ -342,7 +371,7 @@ while True:
 
         if pygame.mouse.get_pressed()[2] and not primaryCooldown:
 
-            px, py = getNormDir(CHAR_X, CHAR_Y, mouse_x, mouse_y)
+            px, py = getNormDir(gx, gy, mouse_x, mouse_y)
             if isHost:
                 disparar("slime", gx, gy, px, py)
             else:
@@ -376,10 +405,10 @@ while True:
     WIN.fill((0,0,0))
 
     # Dibuja el fondo
-    for y in range(GRID_HEIGHT):
-        for x in range(GRID_WIDTH):
-            block = getBlockInGrid(x,y)
-            if getBlockInGrid(x,y) == 0:
+    for x in range(GRID_WIDTH):
+        for y in range(GRID_HEIGHT):
+            block = getBlockInGrid(x, y)
+            if block == 0:
                 WIN.blit(worldSprites[getBlockInBack(x, y)], (x * GRID_SIZE, y * GRID_SIZE))
             else:
                 WIN.blit(worldSprites[getBlockInBack(x, y)], (x * GRID_SIZE, y * GRID_SIZE))
