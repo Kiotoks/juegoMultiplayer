@@ -29,7 +29,9 @@ worldfile = []
 blockSounds = []
 worldSprites = []
 enemSprites = []
+tileSprites = []
 bufferMensajes = []
+MAP_SIZE = 10
 
 cwd = os.getcwd()
 
@@ -43,6 +45,10 @@ for i in range(7):
 for i in range(1):
     enemSprites.append(pygame.image.load(f'{cwd}/files/sprites/enem{i}.png'))
     enemSprites[i] = pygame.transform.scale(enemSprites[i], (GRID_SIZE, GRID_SIZE))
+
+for i in range(16):
+    tileSprites.append(pygame.image.load(f'{cwd}/files/maptiles/tile{i}.png'))
+    tileSprites[i] = pygame.transform.scale(tileSprites[i], (MAP_SIZE, MAP_SIZE))
 
 # Reloj para controlar los FPS
 clock = pygame.time.Clock()
@@ -64,6 +70,7 @@ cantEnemigos = 0
 
 online = False
 isHost = False
+isOnDng = False
 
 movimiento = False
 
@@ -122,34 +129,37 @@ def cambiarBloque(x, y , id, out):
 def colocarPuertas(sides):
     def ponerMuro(x, y):
         worldfile[y][x] = 0
-
-    bloque = 0
     print(sides)
-    if sides[0]:
+    bloque = 0
+    if sides[3] == 1:
+        print("puerta izquierda")
         ponerMuro(0, math.trunc(GRID_HEIGHT/2))
         ponerMuro(0, math.trunc(GRID_HEIGHT/2)+1)
-    if sides[1]:
+    if sides[0]  == 1:
+        print("puerta arriba")
         ponerMuro(math.trunc(GRID_WIDTH/2), 0)
         ponerMuro(math.trunc(GRID_WIDTH/2)+1, 0)
-    if sides[2]:
+    if sides[1]  == 1:
+        print("puerta derecha")
         ponerMuro(GRID_WIDTH-1, math.trunc(GRID_HEIGHT/2))
         ponerMuro(GRID_WIDTH-1, math.trunc(GRID_HEIGHT/2)+1)
-    if sides[3]:
+    if sides[2]  == 1:
+        print("puerta abajo")
         ponerMuro(math.trunc(GRID_WIDTH/2), GRID_HEIGHT-1)
-        ponerMuro(math.trunc(GRID_WIDTH/2)+1, GRID_HEIGHT)
+        ponerMuro(math.trunc(GRID_WIDTH/2)+1, GRID_HEIGHT-1)
 
 
 def crearBorde(sides):
     global worldfile
+    bloqueBorde = 2
     print("ly", len(worldfile))
     print("lxdw",(worldfile[0]))
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
-            print(x, y)
             if x  ==  0 or y == 0:
-                cambiarBloque(x, y, 2, False)
+                worldfile[y][x] =  bloqueBorde
             if x  ==  GRID_WIDTH-1 or y == GRID_HEIGHT-1:
-               cambiarBloque(x, y, 2, False)
+                worldfile[y][x] =  bloqueBorde
     colocarPuertas(sides)
     
 def cargarEnemigos(enemArray, ronda):
@@ -161,6 +171,8 @@ def cargarEnemigos(enemArray, ronda):
 
 def cargarHabitacion(dy, dx):
     global worldfile, background, cwd, dungeon, ronda
+    print(f"habitacion cargada y: {dy}, x: {dx}")
+    bufferMensajes.append({"room":{"x":x, "y":y}})
     room = dungeon[dy][dx]
     nombre = room["room"]
     with open(cwd+"/files/data/rooms.json", 'r') as archivo:
@@ -173,12 +185,20 @@ def cargarHabitacion(dy, dx):
     cargarEnemigos(datos[nombre]["enemiesRounds"], ronda)
 
 def entrarDungeon(lvl):
-    global dungeon, CHAR_X, CHAR_Y, DNG_X, DNG_Y
+    global dungeon, CHAR_X, CHAR_Y, DNG_X, DNG_Y, isOnDng
     CHAR_X, CHAR_Y = WIDTH/2, HEIGHT/2
     levels = [(10, 10, 10)] #reemplazar en el futuro por un json
     lvldim = levels[lvl-1]
-
-    dungeon, spawn = gp.generarDungeon(lvldim[0],lvldim[1], lvldim[2], lvl)
+    bufferMensajes.append({"dungeon":{"d":"sas"}})
+    isOnDng = True
+    while True:
+        try:
+            dungeon, spawn = gp.generarDungeon(lvldim[0],lvldim[1], lvldim[2], lvl)
+            print("spawn que llego:", spawn)
+        except:
+            print("fallo generacion")
+        finally:
+            break
     
     DNG_Y, DNG_X = spawn[0], spawn[1]
     
@@ -238,7 +258,6 @@ def enviar():
 def handleMsg(msg):
 # Procesar el objeto JSON
     global SCX, SCY
-    print(msg)
     if "bloque" in msg:
         bloque = msg["bloque"]
         cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
@@ -290,20 +309,55 @@ def abrirServidor():
     hilo_recibir= threading.Thread(target=recibir)
     hilo_recibir.start()
 
+def killAll():
+    global entities
+    entities = []
+
+def restart():
+    global worldfile, background, isOnDng, dungeon, DNG_X, DNG_Y
+    dungeon = None
+    DNG_X = 0
+    DNG_Y = 0
+    isOnDng = False
+    worldfile = readWorldData("foreground")
+    background = readWorldData("background")
+    killAll()
+
 def die():
-    global CHAR_X, CHAR_Y, HEIGHT, WIDTH, VIDA
+    global CHAR_X, CHAR_Y, HEIGHT, WIDTH, VIDA, isOnDng
     CHAR_X = WIDTH/2
     CHAR_Y = HEIGHT/2
     VIDA = 10
+    if isOnDng:
+        restart()
+
+
 
 def applyDmg():
     global VIDA, dmgCooldown
     if VIDA > 0:
         VIDA -= 1
-        print(VIDA)
     if not VIDA:
         die()
     dmgCooldown = 30
+
+def renderMap():
+    global dungeon, isOnDng
+
+    transparent_color = (255, 0, 0, 128)  # Black with 50% transparency
+
+    # Create a Surface with SRCALPHA to allow transparency
+    rect_surface = pygame.Surface((MAP_SIZE, MAP_SIZE), pygame.SRCALPHA)
+    rect_surface.fill(transparent_color)
+
+    if isOnDng:
+        for y in range(10):
+            for x in range(10):
+                cellvalue = dungeon[y][x]
+                if cellvalue:
+                    WIN.blit(tileSprites[cellvalue["img"]], (x * MAP_SIZE, y * MAP_SIZE))
+                if x == DNG_X and y == DNG_Y:
+                    WIN.blit(rect_surface, (x * MAP_SIZE, y * MAP_SIZE))
 
 def renderUI():
     global font, WIN, VIDA, bloqueSeleccionado
@@ -314,6 +368,7 @@ def renderUI():
     #renderizar bloque seleccionado
     pygame.draw.rect(WIN, (255,255,255), pygame.Rect(17, HEIGHT - 23 - GRID_SIZE, GRID_SIZE+ 6, GRID_SIZE + 6))
     WIN.blit(worldSprites[bloqueSeleccionado], (20, HEIGHT - 20 - GRID_SIZE))
+    renderMap()
 
 def crearHabitacion(): #solo debug
     with open(f"{cwd}/files/saves/room.txt", "w") as file:
@@ -395,6 +450,7 @@ while True:
         CHAR_VX = 0
     if chequearColisionAxis(CHAR_X, futuro_y):
         CHAR_VY = 0
+
     gx = CHAR_X+CHAR_SIZE/2
     gy = CHAR_Y+ CHAR_SIZE/2
 
@@ -449,6 +505,23 @@ while True:
     # Asegúrate de que el personaje no se salga de la ventana
     CHAR_X = max(0, min(CHAR_X, WIDTH - CHAR_SIZE))
     CHAR_Y = max(0, min(CHAR_Y, HEIGHT - CHAR_SIZE))
+    if isOnDng:
+        if CHAR_X < 40:
+            DNG_X -= 1
+            cargarHabitacion(DNG_Y, DNG_X)
+            CHAR_X = WIDTH - 80
+        elif CHAR_X > WIDTH - 40:
+            DNG_X += 1
+            cargarHabitacion(DNG_Y, DNG_X)
+            CHAR_X = 50
+        if CHAR_Y < 40:
+            DNG_Y -= 1
+            cargarHabitacion(DNG_Y, DNG_X)
+            CHAR_Y = HEIGHT - 80
+        elif CHAR_Y > HEIGHT - 40:
+            DNG_Y += 1
+            cargarHabitacion(DNG_Y, DNG_X)
+            CHAR_Y = 50
 
     WIN.fill((0,0,0))
 

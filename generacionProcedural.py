@@ -68,15 +68,20 @@ def llenarMatriz(width, height):
 def fillRooms(grid, ends, level):
 
     rooms = ["chest", "normal", "tienda"]
-    grid[ends[0][0]][ends[0][1]]["room"] = "spawn"
-    grid[ends[1][0]][ends[1][1]]["room"] = "boss"
+    print("ends:", ends)
+    spawn = ends[0]
+    boss = ends[1]
+    print("spawn en generacion:", spawn)
+    print("boss en generacion:", boss)
+    grid[spawn[0]][spawn[1]]["room"] = "spawn"
+    grid[boss[0]][boss[1]]["room"] = "boss"
     for i in range(GRID_HEIGHT):
         for j in range(GRID_WIDTH):
             cell = grid[i][j]
             if cell != None:
                 print(cell["room"])
                 if cell["room"] == "":
-                    grid[i][j] = rooms[random.randint(0, len(rooms)-1)]
+                    grid[i][j]["room"] = rooms[random.randint(0, len(rooms)-1)]
     return grid
 
 def getSides(cell, i, j):
