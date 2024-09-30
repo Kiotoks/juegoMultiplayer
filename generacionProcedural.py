@@ -18,22 +18,22 @@ def getCompatibles(tileSides):
 #se deberia de usar map() y find para hacer el codigo mas eficiente
 
 tiles = []
-tiles.append({"img":15,"sides": [0,0,0,0],"name": "BLANK", "end": False, "room":""})
-tiles.append({"img":10,"sides": [1,1,0,1],"name": "UP T", "end": False, "room":""})
-tiles.append({"img":7,"sides": [1,1,1,0],"name": "RIGHT T", "end": False, "room":""})
-tiles.append({"img":8,"sides": [0,1,1,1],"name": "DOWN T", "end": False, "room":""})
-tiles.append({"img":9,"sides": [1,0,1,1],"name": "LEFT T", "end": False, "room":""})
-tiles.append({"img":13,"sides": [0,0,1,0],"name": "END DOWN", "end": True, "room":""})
-tiles.append({"img":14,"sides": [0,0,0,1],"name": "END LEFT", "end": True, "room":""})
-tiles.append({"img":11,"sides": [1,0,0,0],"name": "END UP", "end": True, "room":""})
-tiles.append({"img":12,"sides": [0,1,0,0],"name": "END RIGHT", "end": True, "room":""})
-tiles.append({"img":2,"sides": [0,1,0,1],"name": "H LINE", "end": False, "room":""})
-tiles.append({"img":1,"sides": [1,0,1,0],"name": "V LINE", "end": False, "room":""})
-tiles.append({"img":3,"sides": [1,1,0,0],"name": "UP L", "end": False, "room":""})
-tiles.append({"img":4,"sides": [0,1,1,0],"name": "RIGHT L", "end": False, "room":""})
-tiles.append({"img":5,"sides": [0,0,1,1],"name": "DOWN L", "end": False, "room":""})
-tiles.append({"img":6,"sides": [1,0,0,1],"name": "LEFT L", "end": False, "room":""})
-tiles.append({"img":0,"sides": [1,1,1,1],"name": "START CROSS", "end": False, "room":""})
+tiles.append({"img":15,"sides": [0,0,0,0],"name": "BLANK", "end": False, "room":"","visited":False})
+tiles.append({"img":10,"sides": [1,1,0,1],"name": "UP T", "end": False, "room":"","visited":False})
+tiles.append({"img":7,"sides": [1,1,1,0],"name": "RIGHT T", "end": False, "room":"","visited":False})
+tiles.append({"img":8,"sides": [0,1,1,1],"name": "DOWN T", "end": False, "room":"","visited":False})
+tiles.append({"img":9,"sides": [1,0,1,1],"name": "LEFT T", "end": False, "room":"","visited":False})
+tiles.append({"img":13,"sides": [0,0,1,0],"name": "END DOWN", "end": True, "room":"","visited":False})
+tiles.append({"img":14,"sides": [0,0,0,1],"name": "END LEFT", "end": True, "room":"","visited":False})
+tiles.append({"img":11,"sides": [1,0,0,0],"name": "END UP", "end": True, "room":"","visited":False})
+tiles.append({"img":12,"sides": [0,1,0,0],"name": "END RIGHT", "end": True, "room":"","visited":False})
+tiles.append({"img":2,"sides": [0,1,0,1],"name": "H LINE", "end": False, "room":"","visited":False})
+tiles.append({"img":1,"sides": [1,0,1,0],"name": "V LINE", "end": False, "room":"","visited":False})
+tiles.append({"img":3,"sides": [1,1,0,0],"name": "UP L", "end": False, "room":"","visited":False})
+tiles.append({"img":4,"sides": [0,1,1,0],"name": "RIGHT L", "end": False, "room":"","visited":False})
+tiles.append({"img":5,"sides": [0,0,1,1],"name": "DOWN L", "end": False, "room":"","visited":False})
+tiles.append({"img":6,"sides": [1,0,0,1],"name": "LEFT L", "end": False, "room":"","visited":False})
+tiles.append({"img":0,"sides": [1,1,1,1],"name": "START CROSS", "end": False, "room":"","visited":False})
 
 levelsRooms =[
     {"chest": 2, "tienda": 1, "mina": 2},

@@ -84,6 +84,7 @@ bloqueSeleccionado = 2
 bufferBloques = []
 proyectiles = []
 entities = []
+dungeon = []
 nivel = 0
 ronda = 0
 
@@ -129,22 +130,17 @@ def cambiarBloque(x, y , id, out):
 def colocarPuertas(sides):
     def ponerMuro(x, y):
         worldfile[y][x] = 0
-    print(sides)
     bloque = 0
     if sides[3] == 1:
-        print("puerta izquierda")
         ponerMuro(0, math.trunc(GRID_HEIGHT/2))
         ponerMuro(0, math.trunc(GRID_HEIGHT/2)+1)
     if sides[0]  == 1:
-        print("puerta arriba")
         ponerMuro(math.trunc(GRID_WIDTH/2), 0)
         ponerMuro(math.trunc(GRID_WIDTH/2)+1, 0)
     if sides[1]  == 1:
-        print("puerta derecha")
         ponerMuro(GRID_WIDTH-1, math.trunc(GRID_HEIGHT/2))
         ponerMuro(GRID_WIDTH-1, math.trunc(GRID_HEIGHT/2)+1)
     if sides[2]  == 1:
-        print("puerta abajo")
         ponerMuro(math.trunc(GRID_WIDTH/2), GRID_HEIGHT-1)
         ponerMuro(math.trunc(GRID_WIDTH/2)+1, GRID_HEIGHT-1)
 
@@ -152,8 +148,6 @@ def colocarPuertas(sides):
 def crearBorde(sides):
     global worldfile
     bloqueBorde = 2
-    print("ly", len(worldfile))
-    print("lxdw",(worldfile[0]))
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
             if x  ==  0 or y == 0:
@@ -169,27 +163,36 @@ def cargarEnemigos(enemArray, ronda):
             cantEnemigos += 1
             entities.append(Slime(e["x"], e["y"], cantEnemigos))
 
-def cargarHabitacion(dy, dx):
-    global worldfile, background, cwd, dungeon, ronda
-    print(f"habitacion cargada y: {dy}, x: {dx}")
-    bufferMensajes.append({"room":{"x":x, "y":y}})
-    room = dungeon[dy][dx]
-    nombre = room["room"]
+def cargarPorRoom(room):
+    global worldfile, background, cwd, ronda, entities
+    entities = []
     with open(cwd+"/files/data/rooms.json", 'r') as archivo:
         datos = json.load(archivo)
     #añadir spawn de enemigos
-    background =  datos[nombre]["background"]
-    worldfile = datos[nombre]["foreground"]
+    nombre = room["room"]
+    hab = datos[nombre]
+    background =  hab["background"]
+    worldfile = hab["foreground"]
     crearBorde(room["sides"])
     ronda = 0
-    cargarEnemigos(datos[nombre]["enemiesRounds"], ronda)
+    if room["visited"] == False:
+        cargarEnemigos(datos[nombre]["enemiesRounds"], ronda)
+
+def cargarHabitacion(dy, dx):
+    global entities, dungeon
+    entities = []
+    print(f"habitacion cargada y: {dy}, x: {dx}")
+    room = dungeon[dy][dx]
+    bufferMensajes.append({"room": room})
+    cargarPorRoom(room)
+    dungeon[dy][dx]["visited"] = True
+    
 
 def entrarDungeon(lvl):
     global dungeon, CHAR_X, CHAR_Y, DNG_X, DNG_Y, isOnDng
     CHAR_X, CHAR_Y = WIDTH/2, HEIGHT/2
     levels = [(10, 10, 10)] #reemplazar en el futuro por un json
     lvldim = levels[lvl-1]
-    bufferMensajes.append({"dungeon":{"d":"sas"}})
     isOnDng = True
     while True:
         try:
@@ -201,7 +204,6 @@ def entrarDungeon(lvl):
             break
     
     DNG_Y, DNG_X = spawn[0], spawn[1]
-    
     cargarHabitacion(DNG_Y,DNG_X) 
 
     pass
@@ -257,7 +259,7 @@ def enviar():
 
 def handleMsg(msg):
 # Procesar el objeto JSON
-    global SCX, SCY
+    global SCX, SCY, dungeon,CHAR_X, CHAR_Y
     if "bloque" in msg:
         bloque = msg["bloque"]
         cambiarBloque(bloque["x"], bloque["y"], bloque["id"], True)
@@ -288,6 +290,16 @@ def handleMsg(msg):
         for en in entities:
             if en.type == "enemy" and en.id == hit["enemy"]:
                 en.applyDmg(hit["dmg"])
+
+    elif "dungeon" in msg:
+        msgdng = msg["d"]
+        dungeon = msgdng
+
+    elif "room" in msg:
+        cargarPorRoom(msg["room"])
+        CHAR_X = SCX
+        CHAR_Y = SCY
+
         
 def recibir():
     delay = 1 / fps
@@ -300,6 +312,7 @@ def recibir():
     pass
 
 def abrirServidor():
+    global isHost
     role = nt.abrirServidor()
     if role == "server":
         isHost = True
@@ -457,7 +470,7 @@ while True:
     bloqueParado = getBlockInGrid(*cambiarCoordsAGrid(gx, gy))
     if bloqueParado == 1 and not dmgCooldown:
         applyDmg()
-    elif bloqueParado == 6 and not dmgCooldown:
+    elif bloqueParado == 6 and not dmgCooldown and isHost:
         nivel += 1
         entrarDungeon(nivel)
         dmgCooldown = 30
